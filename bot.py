@@ -9,6 +9,8 @@ import time
 import threading
 from telebot import types
 
+x = 'test'
+
 bot = telebot.TeleBot('7206218529:AAGXx1IkHVxZ3IrFt09Xgzytanj1n-bpcUI')
 
 @bot.message_handler(commands=['start'])
