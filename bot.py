@@ -67,7 +67,6 @@ def save_task(message, task_plan, user_id, what_time):
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
 
-
 def create_db():
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
@@ -110,20 +109,21 @@ def delete_task_from_db(message):
         connection.commit()
         connection.close()
         print(tasks)
+        proverka_id = "".join(f"{x[0]} " for x in tasks)
         output = "".join(f"{x[0]} - {x[1]} в {x[2]}, {x[3]}\n" for x in tasks)
         print(output)
         bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все твои задачи:")
         bot.send_message(message.chat.id, output)
         bot.send_message(message.chat.id, "Напиши номер задачи, которую хочешь удалить.")
-        bot.register_next_step_handler(message, lambda msg: delete_tasks_from_db(msg))
+        bot.register_next_step_handler(message, lambda msg: delete_tasks_from_db(msg, proverka_id))
     else:
         bot.send_message(message.chat.id, "У тебя нет задач")
 
-def delete_tasks_from_db(message):
+def delete_tasks_from_db(message, proverka_id):
     id = message.text
+    print(proverka_id)
     print(type(id))
-    if id.isdigit():
-        print('мы прошли')
+    if id in proverka_id:
         user_id = message.from_user.id
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
@@ -139,8 +139,10 @@ def delete_tasks_from_db(message):
             connection.commit()
             connection.close()
             bot.send_message(message.chat.id, f"Задача {id} удалена")
-            bot.send_message(message.chat.id, "Список задач пуст.")
+            bot.send_message(message.chat.id, "Список задач пуст." )
     else:
         bot.send_message(message.chat.id, "Такого номера нет.")
+
+
 
 bot.polling(none_stop=True)
