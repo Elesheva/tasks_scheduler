@@ -1,13 +1,14 @@
 import telebot
-import sqlite3
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, Application, MessageHandler, CallbackContext
 from datetime import datetime
-import pytz
-import schedule
 import time
 import threading
 from telebot import types
+from pytz import utc
+from apscheduler.schedulers.background import BackgroundScheduler
+import sqlite3
+from datetime import datetime
 
 bot = telebot.TeleBot('7206218529:AAGXx1IkHVxZ3IrFt09Xgzytanj1n-bpcUI')
 
@@ -30,6 +31,9 @@ def whattime(message, user_id):
     bot.send_message(message.chat.id, "На какое время? (Например - 13:30)")
     bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id))
 
+
+
+
 def save_time(message, task_plan, user_id):
     what_time = message.text
     # Проверяем, что часы в диапазоне от 0 до 23 и минуты от 0 до 59
@@ -41,15 +45,16 @@ def save_time(message, task_plan, user_id):
         else:
             bot.send_message(message.chat.id,
                              f"Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
+            bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id))
 
     except ValueError:
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
-
+        bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id))
 def save_task(message, task_plan, user_id, what_time):
     date_time = message.text
     try:
-        month, days = map(int, date_time.split('.'))
+        days, month = map(int, date_time.split('.'))
         print(month, days)
         if 1 <= month <= 12 and 1 <= days < 32:
             connection = sqlite3.connect('my_database.db')
@@ -62,10 +67,12 @@ def save_task(message, task_plan, user_id, what_time):
         else:
             bot.send_message(message.chat.id,
                              f"Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+            bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time))
 
     except ValueError:
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+        bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time))
 
 def create_db():
     connection = sqlite3.connect('my_database.db')
@@ -91,11 +98,13 @@ def get_all_tasks_from_db(message):
     print(tasks)
     connection.commit()
     connection.close()
-    output = "".join(f"{x[0]} в {x[1]}, {x[2]}\n" for x in tasks)
+    output = "".join(f"{i+1}) {tasks[i][0]} в {tasks[i][1]}, {tasks[i][2]}\n" for i in range(len(tasks)))
     print(output)
-    bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все твои задачи:")
-    bot.send_message(message.chat.id, output)
-
+    if len(output) != 0:
+        bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все твои задачи:")
+        bot.send_message(message.chat.id, output)
+    else:
+        bot.send_message(message.chat.id, f'{message.from_user.first_name} {message.from_user.last_name}, у тебя нет задач:)')
 @bot.message_handler(commands=['delete_tasks'])
 def delete_task_from_db(message):
     user_id = message.from_user.id
@@ -143,6 +152,32 @@ def delete_tasks_from_db(message, proverka_id):
     else:
         bot.send_message(message.chat.id, "Такого номера нет.")
 
+def send_message_ga(user_id, message):
+    # Здесь должна быть логика отправки сообщения пользователю
+    print(f"Отправлено сообщение '{message}' пользователю {user_id}")
+
+
+def check_tasks():
+    conn = sqlite3.connect('my_database.db')
+    cursor = conn.cursor()
+    now = datetime.now()
+    current_time = now.strftime("%H:%M")
+    current_date = now.strftime("%d.%m")
+
+    cursor.execute("SELECT user_id, task FROM tasks WHERE task_time = ? AND date = ?", (current_time, current_date))
+    tasks = cursor.fetchall()
+
+    for task in tasks:
+        user_id, message = task
+        send_message_ga(user_id, message)
+
+    conn.close()
+
+
+scheduler = BackgroundScheduler()
+# Запланируем выполнение функции check_tasks каждую минуту
+scheduler.add_job(check_tasks, 'interval', minutes=1)
+scheduler.start()
 
 
 bot.polling(none_stop=True)
