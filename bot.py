@@ -20,59 +20,78 @@ def send_welcome(message):
     else:
         bot.send_message(message.chat.id, f"Привет, {message.from_user.first_name} {lastname} 👋 Я твой персональный помощник по планированию задач.")
 
+
+# БЛОК ДОБАВЛЕНИЯ НОВОЙ НЕРЕГУЛЯРНОЙ ЗАДАЧИ
+
 @bot.message_handler(commands=['add_task'])
 def new_task(message):
+    regular = False
     create_db()
     bot.send_message(message.chat.id, "Какую задачу хочешь запланировать?")
-    bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id))
+    bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular))
 
-def whattime(message, user_id):
+
+def whattime(message, user_id, regular):
+    regular = regular
     task_plan = message.text
     bot.send_message(message.chat.id, "На какое время? (Например - 13:30)")
-    bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id))
+    bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular))
 
 
-
-
-def save_time(message, task_plan, user_id):
+def save_time(message, task_plan, user_id, regular):
+    regular = regular
     what_time = message.text
     # Проверяем, что часы в диапазоне от 0 до 23 и минуты от 0 до 59
     try:
         hours, minutes = map(int, what_time.split(':'))
         if 0 <= hours < 24 and 0 <= minutes < 60:
             bot.send_message(message.chat.id, "На какую дату хочешь запланировать? Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
-            bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time))
+            bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular))
         else:
             bot.send_message(message.chat.id,
                              f"Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
-            bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id))
+            bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular))
 
     except ValueError:
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
         bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id))
-def save_task(message, task_plan, user_id, what_time):
+
+
+def save_task(message, task_plan, user_id, what_time, regular):
     date_time = message.text
+    regular = regular
     try:
         days, month = map(int, date_time.split('.'))
         print(month, days)
         if 1 <= month <= 12 and 1 <= days < 32:
             connection = sqlite3.connect('my_database.db')
             cursor = connection.cursor()
-            cursor.execute('INSERT INTO tasks (user_id, task, task_time, date) VALUES (?, ?, ?, ?)',
-                           (user_id, task_plan, what_time, date_time))
+            cursor.execute('INSERT INTO tasks (user_id, task, task_time, date, regular_task) VALUES (?, ?, ?, ?, ?)',
+                           (user_id, task_plan, what_time, date_time, regular))
             connection.commit()
             connection.close()
             bot.send_message(message.chat.id, "Задача добавлена!")
         else:
             bot.send_message(message.chat.id,
                              f"Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
-            bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time))
+            bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular))
 
     except ValueError:
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
-        bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time))
+        bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular))
+
+
+# БЛОК ДОБАВЛЕНИЯ НОВОЙ НЕРЕГУЛЯРНОЙ ЗАДАЧИ
+
+@bot.message_handler(commands=['add_regular_task'])
+def new_task(message):
+    regular = True
+    create_db()
+    bot.send_message(message.chat.id, "Какую задачу хочешь запланировать?")
+    bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular))
+
 
 def create_db():
     connection = sqlite3.connect('my_database.db')
@@ -82,7 +101,9 @@ def create_db():
         user_id INTEGER,
         task TEXT,
         task_time TEXT,
-        date TEXT
+        date TEXT,
+        regular_task BOOLEAN,
+        complete BOOLEAN
     ) """)
     connection.commit()
     cursor.close()
@@ -164,13 +185,27 @@ def check_tasks():
     current_time = now.strftime("%H:%M")
     current_date = now.strftime("%d.%m")
 
-    cursor.execute("SELECT user_id, task FROM tasks WHERE task_time = ? AND date = ?", (current_time, current_date))
+    # Выборка задач с текущим временем и датой
+    cursor.execute("""
+        SELECT id, user_id, task, regular_task 
+        FROM tasks 
+        WHERE task_time = ? AND date = ?
+    """, (current_time, current_date))
     tasks = cursor.fetchall()
 
     for task in tasks:
-        user_id, message = task
+        task_id, user_id, message, regular_task = task
         send_message_ga(user_id, message)
 
+        # Если задача не регулярная, обновляем complete на True
+        if not regular_task:
+            cursor.execute("""
+                UPDATE tasks 
+                SET complete = 1 
+                WHERE id = ?
+            """, (task_id,))
+
+    conn.commit()
     conn.close()
 
 

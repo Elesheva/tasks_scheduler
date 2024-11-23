@@ -1,2 +1,6 @@
-ll = [(1, 2), (3, 2)]
-print(len(ll))
+x = None
+
+if not x:
+    print('1')
+else:
+    print('2')
