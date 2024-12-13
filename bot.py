@@ -1,13 +1,13 @@
 import telebot
 from telebot import types
-
+import create_db
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, Application, MessageHandler, CallbackContext
 from datetime import datetime
 import time
 import threading
-
 from pytz import utc
+
 from apscheduler.schedulers.background import BackgroundScheduler
 import sqlite3
 from datetime import datetime
@@ -17,35 +17,79 @@ bot = telebot.TeleBot('7206218529:AAGXx1IkHVxZ3IrFt09Xgzytanj1n-bpcUI')
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    create_db()
+    create_db.create_db()
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
     lastname = message.from_user.last_name
     if lastname is None:
-        bot.send_message(message.chat.id, f"Привет, {message.from_user.first_name} 👋 Я твой персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
+        bot.send_message(message.chat.id, f"Здравствуйте, {message.from_user.first_name} 👋 Я ваш персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
                          , reply_markup= markup)
     else:
-        bot.send_message(message.chat.id, f"Привет, {message.from_user.first_name} {lastname} 👋 Я твой персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
+        bot.send_message(message.chat.id, f"Здравствуйте, {message.from_user.first_name} {lastname} 👋 Я ваш персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
                          , reply_markup= markup)
 
 @bot.callback_query_handler(func=lambda callback: True)
 def registr(callback):
     if callback.data == "registration" or "Регистрация":
-        bot.send_message(callback.message.chat.id, "Пожалуйста, введи свое ФИО")
+        bot.send_message(callback.message.chat.id, "Пожалуйста, введите свое ФИО")
         bot.register_next_step_handler(callback.message,lambda msg: register_name(msg))
 
 def register_name (message):
     name = message.text
-    bot.send_message(message.chat.id, f'{name}, вы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите ниже')
-    bot.register_next_step_handler(message, lambda msg: register_student(msg, name))
-    bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name))
+    bot.send_message(message.chat.id, f"{name}, вы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
+    bot.register_next_step_handler(message, lambda msg: register_student(msg, name, message.chat.id))
 
-def register_student(massage, name):
-    if massage.text == "1":
+#РЕГИСТРАЦИЯ СТУДЕНТОВ
+def register_student(message, name, student_id):
+    if message.text == "1":
         print(1)
+        bot.send_message(message.chat.id, f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
+        bot.register_next_step_handler(message, lambda msg: student_nomber(msg, name, student_id))
+    elif message.text == "2":
+        print(2)
+        bot.send_message(message.chat.id,f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
+        bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name, message.chat.id))
+    else:
+        bot.send_message(message.chat.id, f"{name}, вы ввели неверное значение, попробуйте ещё раз.\nВы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
+        bot.register_next_step_handler(message, lambda msg: register_student(msg, name, student_id))
 
+def student_nomber(message, name, student_id):
+    phone_nomber = message.text
+    bot.send_message(message.chat.id, f"{name}, введите вашу почту\nПример: plan_it@mail.com")
+    bot.register_next_step_handler(message, lambda msg: mail_student (msg, name, student_id, phone_nomber))
 
-def register_teacher(message, name):
+def mail_student(message, name, student_id, phone_nomber):
+    mail = message.text
+    bot.send_message(message.chat.id, f"{name}, ваш пол:\n1. Мужской\n2. Женский\nВведите цифру с нужным вариантом:")
+    bot.register_next_step_handler(message, lambda msg: gender_student (msg, name, student_id, phone_nomber, mail))
+
+def gender_student(message, name, student_id, phone_nomber, mail):
+    gender = message.text
+    bot.send_message(message.chat.id, f"{name}, укажите ваш Факультет\nПример: Информационные технологии")
+    bot.register_next_step_handler(message, lambda msg: faculty_student(msg, name, student_id, phone_nomber, mail, gender))
+
+def faculty_student(message, name, student_id, phone_nomber, mail, gender):
+    faculty = message.text
+    bot.send_message(message.chat.id, f"{name}, укажите ваш курс\nПример: 1")
+    bot.register_next_step_handler(message, lambda msg: course_student(msg, name, student_id, phone_nomber, mail, gender, faculty))
+
+def course_student(message, name, student_id, phone_nomber, mail, gender, faculty):
+    course = message.text
+    bot.send_message(message.chat.id, f"{name}, укажите номер вашей группы \nПример: ИД23-3")
+    bot.register_next_step_handler(message,lambda msg: group_number(msg, name, student_id, phone_nomber, mail, gender, faculty, course))
+
+def group_number(message, name, student_id, phone_nomber, mail, gender, faculty, course):
+    group = message.text
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute('INSERT INTO student (student_id, name, phone_number, mail, gender, faculty, course, group_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                   (student_id, name, phone_nomber, mail, gender, faculty, course, group))
+    connection.commit()
+    connection.close()
+    bot.send_message(message.chat.id, "Вы зарегистрированы!")
+
+#РЕГИСТРАЦИЯ ПРЕПОДАВАТЕЛЯ
+def register_teacher(message, name, teacher_id):
     print(message)
 
 @bot.message_handler(commands=['add_task'])
@@ -113,81 +157,6 @@ def new_task(message):
     create_db()
     bot.send_message(message.chat.id, "Какую задачу хочешь запланировать?")
     bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular))
-
-
-def create_db():
-    # Подключение к базе данных
-    connection = sqlite3.connect('my_database.db')
-    cursor = connection.cursor()
-
-    # Создание таблицы tasks
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            task TEXT,
-            task_time TEXT,
-            date TEXT,
-            regular_task BOOLEAN,
-            complete BOOLEAN
-        )
-    """)
-
-    # Создание таблицы teachers
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS teachers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            teacher_id INTEGER,
-            name TEXT,
-            phone_number TEXT,
-            mail TEXT,
-            number_of_generated_tasks INTEGER,
-            gender TEXT,
-            department TEXT
-        )
-    """)
-
-    # Создание таблицы student
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS student (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id INTEGER,
-            name TEXT,
-            phone_number TEXT,
-            mail TEXT,
-            gender TEXT,
-            faculty TEXT,
-            course INTEGER,
-            group_number INTEGER
-        )
-    """)
-
-    # Создание таблицы discipline
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS discipline (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name_of_discipline TEXT,
-            teacher_id INTEGER,
-            faculty TEXT
-        )
-    """)
-
-    # Создание таблицы group
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS groups (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_number INTEGER, 
-            student_id INTEGER,
-            name TEXT,
-            faculty TEXT,
-            course INTEGER
-        )
-    """)
-
-    # Сохранение изменений и закрытие соединения
-    connection.commit()
-    cursor.close()
-    connection.close()
 
 
 @bot.message_handler(commands=['all_tasks'])
@@ -288,6 +257,7 @@ def check_tasks():
 
     conn.commit()
     conn.close()
+
 
 
 scheduler = BackgroundScheduler()
