@@ -1,7 +1,6 @@
 import sqlite3
 
 def create_db():
-    # Подключение к базе данных
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
 
@@ -69,7 +68,6 @@ def create_db():
         )
     """)
 
-    # Сохранение изменений и закрытие соединения
     connection.commit()
     cursor.close()
     connection.close()

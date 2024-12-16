@@ -15,6 +15,7 @@ from datetime import datetime
 
 bot = telebot.TeleBot('7206218529:AAGXx1IkHVxZ3IrFt09Xgzytanj1n-bpcUI')
 
+#ПРИВЕТСВИЕ И РЕГИСТРАЦИЯ
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     create_db.create_db()
@@ -42,13 +43,27 @@ def register_name (message):
 #РЕГИСТРАЦИЯ СТУДЕНТОВ
 def register_student(message, name, student_id):
     if message.text == "1":
-        print(1)
-        bot.send_message(message.chat.id, f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
-        bot.register_next_step_handler(message, lambda msg: student_nomber(msg, name, student_id))
+        #ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (student_id,))
+        count = cursor.fetchone()[0]
+        if count > 0:
+            bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
+        else:
+            bot.send_message(message.chat.id, f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
+            bot.register_next_step_handler(message, lambda msg: student_nomber(msg, name, student_id))
     elif message.text == "2":
         print(2)
-        bot.send_message(message.chat.id,f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
-        bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name, message.chat.id))
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (student_id,))
+        count = cursor.fetchone()[0]
+        if count > 0:
+            bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
+        else:
+            bot.send_message(message.chat.id,f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
+            bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name, message.chat.id))
     else:
         bot.send_message(message.chat.id, f"{name}, вы ввели неверное значение, попробуйте ещё раз.\nВы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
         bot.register_next_step_handler(message, lambda msg: register_student(msg, name, student_id))
@@ -129,10 +144,11 @@ def department_teacher(message, name, teacher_id, teacher_phone_nomber, mail, ge
     connection.close()
     bot.send_message(message.chat.id, "Вы зарегистрированы!")
 
+#ДОБАВЛЕНИЕ ПЕРСОНАЛЬНОЙ НЕРЕГУЛЯРНОЙ ЗАДАЧИ
 @bot.message_handler(commands=['add_task'])
 def new_task(message):
     regular = False
-    bot.send_message(message.chat.id, "Какую задачу хочешь запланировать?")
+    bot.send_message(message.chat.id, "Какую задачу хотите запланировать?")
     bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular))
 
 def whattime(message, user_id, regular):
@@ -148,7 +164,7 @@ def save_time(message, task_plan, user_id, regular):
     try:
         hours, minutes = map(int, what_time.split(':'))
         if 0 <= hours < 24 and 0 <= minutes < 60:
-            bot.send_message(message.chat.id, "На какую дату хочешь запланировать? Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+            bot.send_message(message.chat.id, "На какую дату хотите запланировать? Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
             bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular))
         else:
             bot.send_message(message.chat.id,
@@ -159,7 +175,6 @@ def save_time(message, task_plan, user_id, regular):
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
         bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id))
-
 
 def save_task(message, task_plan, user_id, what_time, regular):
     date_time = message.text
@@ -185,17 +200,14 @@ def save_task(message, task_plan, user_id, what_time, regular):
                          "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
         bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular))
 
-
-# БЛОК ДОБАВЛЕНИЯ НОВОЙ НЕРЕГУЛЯРНОЙ ЗАДАЧИ
-
+# БЛОК ДОБАВЛЕНИЯ НОВОЙ РЕГУЛЯРНОЙ ЗАДАЧИ
 @bot.message_handler(commands=['add_regular_task'])
 def new_task(message):
     regular = True
-    create_db()
-    bot.send_message(message.chat.id, "Какую задачу хочешь запланировать?")
+    bot.send_message(message.chat.id, "Какую задачу хотите запланировать?")
     bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular))
 
-
+#ДОСТАЁМ ВСЕ ЗАДАЧИ ИЗ БД
 @bot.message_handler(commands=['all_tasks'])
 def get_all_tasks_from_db(message):
     user_id = message.from_user.id
@@ -209,10 +221,12 @@ def get_all_tasks_from_db(message):
     output = "".join(f"{i+1}) {tasks[i][0]} в {tasks[i][1]}, {tasks[i][2]}\n" for i in range(len(tasks)))
     print(output)
     if len(output) != 0:
-        bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все твои задачи:")
+        bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
         bot.send_message(message.chat.id, output)
     else:
-        bot.send_message(message.chat.id, f'{message.from_user.first_name} {message.from_user.last_name}, у тебя нет задач:)')
+        bot.send_message(message.chat.id, f'{message.from_user.first_name} {message.from_user.last_name}, у вас нет задач:)')
+
+#УДАЛЕНИЕ ЗАДАЧИ ИЗ БД
 @bot.message_handler(commands=['delete_tasks'])
 def delete_task_from_db(message):
     user_id = message.from_user.id
@@ -229,12 +243,12 @@ def delete_task_from_db(message):
         proverka_id = "".join(f"{x[0]} " for x in tasks)
         output = "".join(f"{x[0]} - {x[1]} в {x[2]}, {x[3]}\n" for x in tasks)
         print(output)
-        bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все твои задачи:")
+        bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
         bot.send_message(message.chat.id, output)
-        bot.send_message(message.chat.id, "Напиши номер задачи, которую хочешь удалить.")
+        bot.send_message(message.chat.id, "Напишите номер задачи, которую хотите удалить.")
         bot.register_next_step_handler(message, lambda msg: delete_tasks_from_db(msg, proverka_id))
     else:
-        bot.send_message(message.chat.id, "У тебя нет задач")
+        bot.send_message(message.chat.id, "У вас нет задач")
 
 def delete_tasks_from_db(message, proverka_id):
     id = message.text
@@ -260,10 +274,10 @@ def delete_tasks_from_db(message, proverka_id):
     else:
         bot.send_message(message.chat.id, "Такого номера нет.")
 
+#НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ
 def send_message_ga(user_id, message):
     # Здесь должна быть логика отправки сообщения пользователю
     print(f"Отправлено сообщение '{message}' пользователю {user_id}")
-
 
 def check_tasks():
     conn = sqlite3.connect('my_database.db')
@@ -271,7 +285,6 @@ def check_tasks():
     now = datetime.now()
     current_time = now.strftime("%H:%M")
     current_date = now.strftime("%d.%m")
-
     # Выборка задач с текущим временем и датой
     cursor.execute("""
         SELECT id, user_id, task, regular_task 
@@ -294,8 +307,6 @@ def check_tasks():
 
     conn.commit()
     conn.close()
-
-
 
 scheduler = BackgroundScheduler()
 # Запланируем выполнение функции check_tasks каждую минуту
