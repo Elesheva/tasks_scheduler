@@ -30,7 +30,7 @@ def send_welcome(message):
 
 @bot.callback_query_handler(func=lambda callback: True)
 def registr(callback):
-    if callback.data == "registration" or "Регистрация":
+    if callback.data == "registration" or callback.data == "Регистрация":
         bot.send_message(callback.message.chat.id, "Пожалуйста, введите свое ФИО")
         bot.register_next_step_handler(callback.message,lambda msg: register_name(msg))
 
@@ -65,8 +65,13 @@ def mail_student(message, name, student_id, phone_nomber):
 
 def gender_student(message, name, student_id, phone_nomber, mail):
     gender = message.text
-    bot.send_message(message.chat.id, f"{name}, укажите ваш Факультет\nПример: Информационные технологии")
-    bot.register_next_step_handler(message, lambda msg: faculty_student(msg, name, student_id, phone_nomber, mail, gender))
+    if gender == "1" or gender == "2":
+        bot.send_message(message.chat.id, f"{name}, укажите ваш Факультет\nПример: Информационные технологии")
+        bot.register_next_step_handler(message, lambda msg: faculty_student(msg, name, student_id, phone_nomber, mail, gender))
+    else:
+        bot.send_message(message.chat.id,
+                         f"{name}, вы ввели неверное значение\nваш пол:\n1. Мужской\n2. Женский\nВведите цифру с нужным вариантом:")
+        bot.register_next_step_handler(message, lambda msg: gender_student (msg, name, student_id, phone_nomber, mail))
 
 def faculty_student(message, name, student_id, phone_nomber, mail, gender):
     faculty = message.text
@@ -75,8 +80,13 @@ def faculty_student(message, name, student_id, phone_nomber, mail, gender):
 
 def course_student(message, name, student_id, phone_nomber, mail, gender, faculty):
     course = message.text
-    bot.send_message(message.chat.id, f"{name}, укажите номер вашей группы \nПример: ИД23-3")
-    bot.register_next_step_handler(message,lambda msg: group_number(msg, name, student_id, phone_nomber, mail, gender, faculty, course))
+    if course == "1" or course == "2" or course == "3" or course == "4":
+        bot.send_message(message.chat.id, f"{name}, укажите номер вашей группы \nПример: ИД23-3")
+        bot.register_next_step_handler(message,lambda msg: group_number(msg, name, student_id, phone_nomber, mail, gender, faculty, course))
+    else:
+        bot.send_message(message.chat.id,
+                         f"{name}, вы ввели неверное значение, укажите ваш курс\nПример: 1")
+        bot.register_next_step_handler(message, lambda msg: course_student(msg, name, student_id, phone_nomber, mail, gender, faculty))
 
 def group_number(message, name, student_id, phone_nomber, mail, gender, faculty, course):
     group = message.text
@@ -90,7 +100,34 @@ def group_number(message, name, student_id, phone_nomber, mail, gender, faculty,
 
 #РЕГИСТРАЦИЯ ПРЕПОДАВАТЕЛЯ
 def register_teacher(message, name, teacher_id):
-    print(message)
+    teacher_phone_nomber = message.text
+    bot.send_message(message.chat.id, f"{name}, введите вашу почту\nПример: plan_it@mail.com")
+    bot.register_next_step_handler(message, lambda msg: mail_teacher (msg, name, teacher_id, teacher_phone_nomber))
+
+def mail_teacher(message, name, teacher_id, teacher_phone_nomber):
+    mail = message.text
+    bot.send_message(message.chat.id, f"{name}, ваш пол:\n1. Мужской\n2. Женский\nВведите цифру с нужным вариантом:")
+    bot.register_next_step_handler(message, lambda msg: gender_teacher (msg, name, teacher_id, teacher_phone_nomber, mail))
+
+def gender_teacher(message, name, teacher_id, teacher_phone_nomber, mail):
+    gender = message.text
+    if gender == "1" or gender == "2":
+        bot.send_message(message.chat.id, f"{name}, укажите наименование вашей кафедры\nПример: Информационные системы")
+        bot.register_next_step_handler(message, lambda msg: department_teacher(msg, name, teacher_id, teacher_phone_nomber, mail, gender))
+    else:
+        bot.send_message(message.chat.id,
+                         f"{name}, вы ввели неверное значение\nваш пол:\n1. Мужской\n2. Женский\nВведите цифру с нужным вариантом:")
+        bot.register_next_step_handler(message, lambda msg: gender_teacher (msg, name, teacher_id, teacher_phone_nomber, mail))
+
+def department_teacher(message, name, teacher_id, teacher_phone_nomber, mail, gender):
+    department = message.text
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute('INSERT INTO teachers (teacher_id, name, phone_number, mail, gender, department) VALUES (?, ?, ?, ?, ?, ?)',
+                   (teacher_id, name, teacher_phone_nomber, mail, gender, department))
+    connection.commit()
+    connection.close()
+    bot.send_message(message.chat.id, "Вы зарегистрированы!")
 
 @bot.message_handler(commands=['add_task'])
 def new_task(message):
