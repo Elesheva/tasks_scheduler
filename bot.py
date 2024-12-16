@@ -34,6 +34,13 @@ def registr(callback):
     if callback.data == "registration" or callback.data == "Регистрация":
         bot.send_message(callback.message.chat.id, "Пожалуйста, введите свое ФИО")
         bot.register_next_step_handler(callback.message,lambda msg: register_name(msg))
+    if callback.data == "Поменять данные" or callback.data == "changing_student":
+        bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер поля, которое хотетите изменить")
+        bot.register_next_step_handler(callback.message, lambda msg: nomber_change(msg))
+    if callback.data == "Поменять данные " or callback.data == "changing_teacher":
+        bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер поля, которое хотетите изменить")
+        bot.register_next_step_handler(callback.message, lambda msg: nomber_change_teacher(msg))
+
 
 def register_name (message):
     name = message.text
@@ -50,6 +57,7 @@ def register_student(message, name, student_id):
         count = cursor.fetchone()[0]
         if count > 0:
             bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
+            changing_student(message,student_id)
         else:
             bot.send_message(message.chat.id, f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
             bot.register_next_step_handler(message, lambda msg: student_nomber(msg, name, student_id))
@@ -57,10 +65,11 @@ def register_student(message, name, student_id):
         print(2)
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
-        cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (student_id,))
+        cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (student_id,))
         count = cursor.fetchone()[0]
         if count > 0:
             bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
+            changing_teacher(message, student_id)
         else:
             bot.send_message(message.chat.id,f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
             bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name, message.chat.id))
@@ -143,6 +152,147 @@ def department_teacher(message, name, teacher_id, teacher_phone_nomber, mail, ge
     connection.commit()
     connection.close()
     bot.send_message(message.chat.id, "Вы зарегистрированы!")
+
+#ИЗМЕНЕНИЕ ДАННЫХ ДЛЯ СТУДЕНТОВ И ПРЕПОДАВАТЕЛЕЙ
+def changing_student(message, student_id):
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT name, phone_number, mail, faculty, course, group_number FROM student WHERE student_id = ?", (student_id,))
+    info_about_student = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    output = "".join(f"Ваши данные:\n1) Имя: {info_about_student[i][0]}\n2) Номер телефона: {info_about_student[i][1]}\n3) Почта: {info_about_student[i][2]}\n4) Факультет: {info_about_student[i][3]}\n5) Курс: {info_about_student[i][4]}\n6) Номер группы: {info_about_student[i][5]}" for i in range(len(info_about_student)))
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Поменять данные", callback_data="changing_student"))
+    bot.send_message(message.chat.id, output, reply_markup= markup)
+
+def nomber_change(message):
+    nomber = message.text
+    student_id = message.chat.id
+    if nomber == "1":
+        bot.send_message(message.chat.id, "Пожалуйста, введите свое ФИО")
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+    if nomber == "2":
+        bot.send_message(message.chat.id, "Пожалуйста, введите новый номер телефона:")
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+    if nomber == "3":
+        bot.send_message(message.chat.id, "Пожалуйста, введите новый почтовый адрес:")
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+    if nomber == "4":
+        bot.send_message(message.chat.id, "Пожалуйста, введите название факультета:")
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+    if nomber == "5":
+        bot.send_message(message.chat.id, "Пожалуйста, введите номер курса:")
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+    if nomber == "6":
+        bot.send_message(message.chat.id, "Пожалуйста, введите номер группы:")
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+    else:
+        bot.send_message(message.chat.id, "Такого номера нет, попробуйте ещё раз")
+        changing_student(message, student_id)
+
+def changing_db_student(message, student_id, nomber):
+    new = message.text
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    if nomber == '1':
+        cursor.execute("UPDATE student SET name = ? WHERE student_id= ?", (new, student_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли ФИО")
+        changing_student(message, student_id)
+    if nomber == "2":
+        cursor.execute("UPDATE student SET phone_number = ? WHERE student_id= ?", (new, student_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли номер телефона")
+        changing_student(message, student_id)
+    if nomber == "3":
+        cursor.execute("UPDATE student SET mail = ? WHERE student_id= ?", (new, student_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли почту")
+        changing_student(message, student_id)
+    if nomber == "4":
+        cursor.execute("UPDATE student SET faculty = ? WHERE student_id= ?", (new, student_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли факультет")
+        changing_student(message, student_id)
+    if nomber == "5":
+        cursor.execute("UPDATE student SET course = ? WHERE student_id= ?", (new, student_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли курс")
+        changing_student(message, student_id)
+    if nomber == "6":
+        cursor.execute("UPDATE student SET group_number = ? WHERE student_id= ?", (new, student_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли номер группы")
+        changing_student(message, student_id)
+
+def changing_teacher (message, teacher_id):
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT name, phone_number, mail, department FROM teachers WHERE teacher_id = ?", (teacher_id,))
+    info_about_teacher = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    output = "".join(
+        f"Ваши данные:\n1) Имя: {info_about_teacher[i][0]}\n2) Номер телефона: {info_about_teacher[i][1]}\n3) Почта: {info_about_teacher[i][2]}\n4) Кафедра: {info_about_teacher[i][3]}"
+        for i in range(len(info_about_teacher)))
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Поменять данные ", callback_data="changing_teacher"))
+    bot.send_message(message.chat.id, output, reply_markup= markup)
+
+def nomber_change_teacher(message):
+    nomber = message.text
+    teacher_id = message.chat.id
+    if nomber == "1":
+        bot.send_message(message.chat.id, "Пожалуйста, введите свое ФИО")
+        bot.register_next_step_handler(message, lambda msg: changing_db_teacher(msg, teacher_id, nomber))
+    if nomber == "2":
+        bot.send_message(message.chat.id, "Пожалуйста, введите новый номер телефона:")
+        bot.register_next_step_handler(message, lambda msg: changing_db_teacher(msg, teacher_id, nomber))
+    if nomber == "3":
+        bot.send_message(message.chat.id, "Пожалуйста, введите новый почтовый адрес:")
+        bot.register_next_step_handler(message, lambda msg: changing_db_teacher(msg, teacher_id, nomber))
+    if nomber == "4":
+        bot.send_message(message.chat.id, "Пожалуйста, введите название кафедры:")
+        bot.register_next_step_handler(message, lambda msg: changing_db_teacher(msg, teacher_id, nomber))
+    else:
+        bot.send_message(message.chat.id, "Такого номера нет, попробуйте ещё раз")
+        changing_teacher(message, teacher_id)
+
+def changing_db_teacher(message, teacher_id, nomber):
+    new = message.text
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    if nomber == '1':
+        cursor.execute("UPDATE teachers SET name = ? WHERE teacher_id= ?", (new, teacher_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли ФИО")
+        changing_teacher (message, teacher_id)
+    if nomber == "2":
+        cursor.execute("UPDATE teachers SET phone_number = ? WHERE teacher_id= ?", (new, teacher_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли номер телефона")
+        changing_teacher (message, teacher_id)
+    if nomber == "3":
+        cursor.execute("UPDATE teachers SET mail = ? WHERE teacher_id= ?", (new, teacher_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли почту")
+        changing_teacher (message, teacher_id)
+    if nomber == "4":
+        cursor.execute("UPDATE teachers SET department = ? WHERE teacher_id= ?", (new, teacher_id))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли кафедру")
+        changing_teacher (message, teacher_id)
 
 #ДОБАВЛЕНИЕ ПЕРСОНАЛЬНОЙ НЕРЕГУЛЯРНОЙ ЗАДАЧИ
 @bot.message_handler(commands=['add_task'])
