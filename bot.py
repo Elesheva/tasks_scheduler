@@ -121,6 +121,8 @@ def group_number(message, name, student_id, phone_nomber, mail, gender, faculty,
     connection.commit()
     connection.close()
     bot.send_message(message.chat.id, "Вы зарегистрированы!")
+    changing_student(message, student_id)
+
 
 #РЕГИСТРАЦИЯ ПРЕПОДАВАТЕЛЯ
 def register_teacher(message, name, teacher_id):
@@ -152,6 +154,7 @@ def department_teacher(message, name, teacher_id, teacher_phone_nomber, mail, ge
     connection.commit()
     connection.close()
     bot.send_message(message.chat.id, "Вы зарегистрированы!")
+    changing_teacher(message, teacher_id)
 
 #ИЗМЕНЕНИЕ ДАННЫХ ДЛЯ СТУДЕНТОВ И ПРЕПОДАВАТЕЛЕЙ
 def changing_student(message, student_id):
@@ -168,28 +171,29 @@ def changing_student(message, student_id):
 
 def nomber_change(message):
     nomber = message.text
+    print(nomber)
     student_id = message.chat.id
     if nomber == "1":
         bot.send_message(message.chat.id, "Пожалуйста, введите свое ФИО")
         bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
-    if nomber == "2":
+    elif nomber == "2":
         bot.send_message(message.chat.id, "Пожалуйста, введите новый номер телефона:")
         bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
-    if nomber == "3":
+    elif nomber == "3":
         bot.send_message(message.chat.id, "Пожалуйста, введите новый почтовый адрес:")
         bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
-    if nomber == "4":
+    elif nomber == "4":
         bot.send_message(message.chat.id, "Пожалуйста, введите название факультета:")
         bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
-    if nomber == "5":
+    elif nomber == "5":
         bot.send_message(message.chat.id, "Пожалуйста, введите номер курса:")
         bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
-    if nomber == "6":
+    elif nomber == "6":
         bot.send_message(message.chat.id, "Пожалуйста, введите номер группы:")
         bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
     else:
-        bot.send_message(message.chat.id, "Такого номера нет, попробуйте ещё раз")
-        changing_student(message, student_id)
+        bot.send_message(message.chat.id, "Такого номера нет, попробуйте ещё раз. Введите номер поля, которое хотите изменить:")
+        bot.register_next_step_handler(message, nomber_change)
 
 def changing_db_student(message, student_id, nomber):
     new = message.text
@@ -201,31 +205,35 @@ def changing_db_student(message, student_id, nomber):
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли ФИО")
         changing_student(message, student_id)
-    if nomber == "2":
+    elif nomber == "2":
         cursor.execute("UPDATE student SET phone_number = ? WHERE student_id= ?", (new, student_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли номер телефона")
         changing_student(message, student_id)
-    if nomber == "3":
+    elif nomber == "3":
         cursor.execute("UPDATE student SET mail = ? WHERE student_id= ?", (new, student_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли почту")
         changing_student(message, student_id)
-    if nomber == "4":
+    elif nomber == "4":
         cursor.execute("UPDATE student SET faculty = ? WHERE student_id= ?", (new, student_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли факультет")
         changing_student(message, student_id)
-    if nomber == "5":
-        cursor.execute("UPDATE student SET course = ? WHERE student_id= ?", (new, student_id))
-        connection.commit()
-        connection.close()
-        bot.send_message(message.chat.id, "Вы поменяли курс")
-        changing_student(message, student_id)
-    if nomber == "6":
+    elif nomber == "5":
+        if new == "1" or new == "2" or new == "3" or new == "4":
+            cursor.execute("UPDATE student SET course = ? WHERE student_id= ?", (new, student_id))
+            connection.commit()
+            connection.close()
+            bot.send_message(message.chat.id, "Вы поменяли курс")
+            changing_student(message, student_id)
+        else:
+            bot.send_message(message.chat.id, "Вы ввели неверное значение, укажите ваш курс\nПример: 1")
+            bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+    elif nomber == "6":
         cursor.execute("UPDATE student SET group_number = ? WHERE student_id= ?", (new, student_id))
         connection.commit()
         connection.close()
@@ -252,18 +260,18 @@ def nomber_change_teacher(message):
     if nomber == "1":
         bot.send_message(message.chat.id, "Пожалуйста, введите свое ФИО")
         bot.register_next_step_handler(message, lambda msg: changing_db_teacher(msg, teacher_id, nomber))
-    if nomber == "2":
+    elif nomber == "2":
         bot.send_message(message.chat.id, "Пожалуйста, введите новый номер телефона:")
         bot.register_next_step_handler(message, lambda msg: changing_db_teacher(msg, teacher_id, nomber))
-    if nomber == "3":
+    elif nomber == "3":
         bot.send_message(message.chat.id, "Пожалуйста, введите новый почтовый адрес:")
         bot.register_next_step_handler(message, lambda msg: changing_db_teacher(msg, teacher_id, nomber))
-    if nomber == "4":
+    elif nomber == "4":
         bot.send_message(message.chat.id, "Пожалуйста, введите название кафедры:")
         bot.register_next_step_handler(message, lambda msg: changing_db_teacher(msg, teacher_id, nomber))
     else:
-        bot.send_message(message.chat.id, "Такого номера нет, попробуйте ещё раз")
-        changing_teacher(message, teacher_id)
+        bot.send_message(message.chat.id, "Такого номера нет, попробуйте ещё раз. Введите номер поля, которое хотетите изменить:")
+        bot.register_next_step_handler(message, nomber_change_teacher)
 
 def changing_db_teacher(message, teacher_id, nomber):
     new = message.text
@@ -293,6 +301,70 @@ def changing_db_teacher(message, teacher_id, nomber):
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли кафедру")
         changing_teacher (message, teacher_id)
+
+#Функции для преподавателя
+#ДОБАВЛЕНИЕ ПРЕПОДАВАТЕЛЕМ ДАННЫХ В ТАБЛИЦУ ДИСЦИПЛИНА
+@bot.message_handler(commands=['add_discipline'])
+def add_data_to_table_discipline(message):
+    bot.send_message(message.chat.id, "Введите название вашей дисциплины:")
+    bot.register_next_step_handler(message, lambda msg: to_table_discipline(msg, message.from_user.id))
+
+def to_table_discipline(message, teacher_id):
+    name_discipline = message.text
+    bot.send_message(message.chat.id, "Введите название факультета:")
+    bot.register_next_step_handler(message, lambda msg: to_table_dis(msg, name_discipline, teacher_id))
+
+def to_table_dis(message, name_discipline, teacher_id):
+    name_facyltet = message.text
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute('INSERT INTO discipline (name_of_discipline, teacher_id, faculty) VALUES (?, ?, ?)',
+                   (name_discipline, teacher_id, name_facyltet))
+    connection.commit()
+    connection.close()
+    bot.send_message(message.chat.id, "Дисциплина создана")
+    groap_table(message, teacher_id)
+
+def groap_table(message, teacher_id):
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
+    faculty = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    if not faculty:
+        bot.send_message(message.chat.id, "Нет доступных факультетов.")
+        return
+    output = "".join(f"{faculty[i][0]}) {faculty[i][1]}\n"for i in range(len(faculty)))
+    bot.send_message(message.chat.id, f"Вы создали следующие факультеты:\n{output}\nУкажите номер факультета, в котором создаётся группа:")
+    print(output)
+    bot.register_next_step_handler(message, lambda msg: to_table_groap(msg, teacher_id, faculty))
+
+def to_table_groap(message, teacher_id, faculty):
+    id = int(message.text)
+    if any(f[0] == id for f in faculty):
+        facultet = faculty[id-1][1]
+        bot.send_message(message.chat.id, f"Вы выбрали: {facultet}\nВведите номер группы:")
+        bot.register_next_step_handler(message, lambda msg: to_groap(msg, teacher_id, facultet))
+    else:
+        bot.send_message(message.chat.id, "Неверный номер факультета. Пожалуйста, попробуйте снова.")
+        bot.register_next_step_handler(message, lambda msg: to_table_groap(msg, teacher_id, facultet))
+
+def to_groap(message, teacher_id, facultet):
+    group = message.text
+    bot.send_message(message.chat.id, "Укажите курс:")
+    bot.register_next_step_handler(message, lambda msg: to_tableee_groap(msg, teacher_id, facultet, group))
+
+def to_tableee_groap(message, teacher_id, facultet, group):
+        cyrs = message.text
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute('INSERT INTO groups (group_number, faculty, course) VALUES (?, ?, ?)',
+                   (group, facultet, cyrs))
+        connection.commit()
+        connection.close()
+
+
 
 #ДОБАВЛЕНИЕ ПЕРСОНАЛЬНОЙ НЕРЕГУЛЯРНОЙ ЗАДАЧИ
 @bot.message_handler(commands=['add_task'])

@@ -60,9 +60,7 @@ def create_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS groups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_number INTEGER, 
-            student_id INTEGER,
-            name TEXT,
+            group_number TEXT, 
             faculty TEXT,
             course INTEGER
         )
