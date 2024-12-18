@@ -1,4 +1,5 @@
 import telebot
+from pyexpat.errors import messages
 from telebot import types
 import create_db
 from telegram import Update
@@ -40,6 +41,18 @@ def registr(callback):
     if callback.data == "Поменять данные " or callback.data == "changing_teacher":
         bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер поля, которое хотетите изменить")
         bot.register_next_step_handler(callback.message, lambda msg: nomber_change_teacher(msg))
+
+    if callback.data == "Поменять" or callback.data == "changing":
+        bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер поля, которое хотетите изменить")
+        bot.register_next_step_handler(callback.message, lambda msg: nomber_change_discepline(msg))
+    if callback.data == "Добавить" or callback.data == "add":
+        add_data_to_table_discipline(callback.message)
+
+    if callback.data == "Поменять данные" or callback.data == "changing_group":
+        bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер поля, которое хотетите изменить")
+        bot.register_next_step_handler(callback.message, lambda msg: nomber_change_group(msg))
+    if callback.data == "Добавить данные" or callback.data == "add_group":
+        groap_table(callback.message)
 
 
 def register_name (message):
@@ -322,10 +335,62 @@ def to_table_dis(message, name_discipline, teacher_id):
                    (name_discipline, teacher_id, name_facyltet))
     connection.commit()
     connection.close()
-    bot.send_message(message.chat.id, "Дисциплина создана")
-    groap_table(message, teacher_id)
+    bot.send_message(message.chat.id, f"Дисциплина создана")
+    select_data_for_teacher(message, teacher_id)
 
-def groap_table(message, teacher_id):
+def select_data_for_teacher(message, teacher_id):
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, name_of_discipline, faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
+    info_about_discipline = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    output = "".join(
+        f"{info_about_discipline[i][0]}) {info_about_discipline[i][1]}, {info_about_discipline[i][2]}\n"
+        for i in range(len(info_about_discipline)))
+    print(output)
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Поменять", callback_data="changing"))
+    markup.add(types.InlineKeyboardButton("Добавить", callback_data="add"))
+    bot.send_message(message.chat.id, f"Дисциплины:\n{output}", reply_markup=markup)
+
+def nomber_change_discepline(message):
+    nomber= message.text
+    bot.send_message(message.chat.id, "Пожалуйста, введите новое название дисциплины")
+    bot.register_next_step_handler(message, lambda msg: changing_discepline(msg, nomber))
+
+def changing_discepline(message,  nomber):
+    discepline = message.text
+    bot.send_message(message.chat.id, "Пожалуйста, введите новое название факультета:")
+    bot.register_next_step_handler(message, lambda msg: changing_disceplineee(msg,nomber, discepline))
+
+def changing_disceplineee(message, nomber, discepline):
+    name_facyltet = message.text
+    nomber = int(nomber)
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, name_of_discipline, faculty FROM discipline WHERE id = ?", (nomber,))
+    faculty = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    if not faculty:
+        bot.send_message(message.chat.id, "Нет данных с таким идентификатором. Вы ввели неверное число")
+        return
+    output = "".join(f"{faculty[i][0]}) {faculty[i][1]}\n" for i in range(len(faculty)))
+    if output:
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute("UPDATE discipline SET name_of_discipline = ?, faculty = ? WHERE id= ?", (discepline, name_facyltet, nomber))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "Вы поменяли данные.")
+        select_data_for_teacher(message, message.chat.id)
+    else:
+        bot.send_message(message.chat.id, "Нет данных с таким идентификатором.")
+
+@bot.message_handler(commands=['add_group'])
+def groap_table(message):
+    teacher_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     cursor.execute("SELECT id, faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
@@ -356,15 +421,60 @@ def to_groap(message, teacher_id, facultet):
     bot.register_next_step_handler(message, lambda msg: to_tableee_groap(msg, teacher_id, facultet, group))
 
 def to_tableee_groap(message, teacher_id, facultet, group):
-        cyrs = message.text
+    cyrs = message.text
+    if cyrs == "1" or cyrs == "2" or cyrs == "3" or cyrs == "4":
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
         cursor.execute('INSERT INTO groups (group_number, faculty, course) VALUES (?, ?, ?)',
                    (group, facultet, cyrs))
         connection.commit()
         connection.close()
+        bot.send_message(message.chat.id, "Группа добавлена, теперь в неё могут добавляться студенты.")
+        spisok_grupp(message)
+    else:
+        bot.send_message(message.chat.id, "Вы ввели неверное значение. Укажите курс:")
+        bot.register_next_step_handler(message, lambda msg:to_tableee_groap(msg, teacher_id, facultet, group))
 
+def spisok_grupp(message):
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute ("SELECT * FROM groups")
+    groups = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    output = "".join(f"{groups[i][0]}) {groups[i][1]}, факультет: {groups[i][2]}, курс: {groups[i][3]}\n" for i in range(len(groups)))
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Поменять данные", callback_data="changing_group"))
+    markup.add(types.InlineKeyboardButton("Добавить данные", callback_data="add_group"))
+    if output:
+        bot.send_message(message.chat.id, f"Все группы:\n{output}", reply_markup=markup)
+    else:
+        bot.send_message(message.chat.id, "Нет данных с таким идентификатором.")
 
+def nomber_change_group(message):
+    nomber= message.text
+    bot.send_message(message.chat.id, "Пожалуйста, введите новый номер группы:")
+    bot.register_next_step_handler(message, lambda msg: changing_group(msg, nomber))
+
+def changing_group(message, nomber):
+    nomber_group = message.text
+    bot.send_message(message.chat.id, "Пожалуйста, введите курс:")
+    bot.register_next_step_handler(message, lambda msg: changing_grouppp(msg, nomber, nomber_group))
+
+def changing_grouppp(message, nomber, nomber_group):
+    cyrs = message.text
+    if cyrs == "1" or cyrs == "2" or cyrs == "3" or cyrs == "4":
+        nomber = int(nomber)
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute ("UPDATE groups SET group_number = ?, course = ? WHERE id= ?", (nomber_group, cyrs, nomber))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id, "вы поменяли данные.")
+        spisok_grupp(message)
+    else:
+        bot.send_message(message.chat.id, "Вы ввели неверное значение. Укажите курс:")
+        bot.register_next_step_handler(message, lambda msg:changing_grouppp(msg, nomber, nomber_group))
 
 #ДОБАВЛЕНИЕ ПЕРСОНАЛЬНОЙ НЕРЕГУЛЯРНОЙ ЗАДАЧИ
 @bot.message_handler(commands=['add_task'])
