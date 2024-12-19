@@ -42,16 +42,16 @@ def registr(callback):
         bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер поля, которое хотетите изменить")
         bot.register_next_step_handler(callback.message, lambda msg: nomber_change_teacher(msg))
 
-    if callback.data == "Поменять" or callback.data == "changing":
+    if callback.data == "Поменять наименование дисциплины" or callback.data == "changing":
         bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер поля, которое хотетите изменить")
         bot.register_next_step_handler(callback.message, lambda msg: nomber_change_discepline(msg))
-    if callback.data == "Добавить" or callback.data == "add":
+    if callback.data == "Добавить дисциплину" or callback.data == "add":
         add_data_to_table_discipline(callback.message)
 
-    if callback.data == "Поменять данные" or callback.data == "changing_group":
+    if callback.data == "Поменять группу" or callback.data == "changing_group":
         bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер поля, которое хотетите изменить")
         bot.register_next_step_handler(callback.message, lambda msg: nomber_change_group(msg))
-    if callback.data == "Добавить данные" or callback.data == "add_group":
+    if callback.data == "Добавить группу" or callback.data == "add_group":
         groap_table(callback.message)
 
 
@@ -135,7 +135,6 @@ def faculty_student(message, name, student_id, phone_nomber, mail, gender, info_
 def course_student(message, name, student_id, phone_nomber, mail, gender, faculty):
     course = int(message.text)
     if course == "1" or course == "2" or course == "3" or course == "4":
-        bot.send_message(message.chat.id, f"{name}, укажите номер вашей группы:")
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
         cursor.execute("SELECT id, group_number, faculty, course FROM groups WHERE faculty = ?, course = ? ", (faculty, course))
@@ -220,57 +219,107 @@ def nomber_change(message):
     nomber = message.text
     print(nomber)
     student_id = message.chat.id
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, faculty FROM discipline")
+    info_about_faculty = cursor.fetchall()
+    connection.commit()
+    connection.close()
     if nomber == "1":
         bot.send_message(message.chat.id, "Пожалуйста, введите свое ФИО")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "2":
         bot.send_message(message.chat.id, "Пожалуйста, введите новый номер телефона:")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "3":
         bot.send_message(message.chat.id, "Пожалуйста, введите новый почтовый адрес:")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "4":
-        bot.send_message(message.chat.id, "Пожалуйста, введите название факультета:")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+        output = "".join(
+            f"{info_about_faculty[i][0]}) {info_about_faculty[i][1]}\n"
+            for i in range(len(info_about_faculty)))
+        bot.send_message(message.chat.id, f"Укажите ваш Факультет:\n{output} ")
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "5":
         bot.send_message(message.chat.id, "Пожалуйста, введите номер курса:")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "6":
-        bot.send_message(message.chat.id, "Пожалуйста, введите номер группы:")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+        try:
+            connection = sqlite3.connect('my_database.db')
+            cursor = connection.cursor()
+            # Получаем информацию о студенте
+            cursor.execute("SELECT faculty, course FROM student WHERE student_id = ?", (student_id,))
+            info_about_student = cursor.fetchall()
+            if not info_about_student:
+                bot.send_message(message.chat.id, "Студент не найден.")
+                return
+            for i in range(len(info_about_student)):
+                faculty = info_about_student[i][0]
+                course = info_about_student[i][1]
+            # Получаем информацию о группах
+            cursor.execute("SELECT id, group_number, faculty, course FROM groups WHERE faculty = ? AND course = ?",
+                           (faculty, course))
+            info_about_faculty = cursor.fetchall()
+
+            if not info_about_faculty:
+                bot.send_message(message.chat.id, "Группы не найдены.")
+                return
+            output = "".join(f"{info_about_faculty[i][0]}) {info_about_faculty[i][1]}, факультет: {info_about_faculty[i][2]}, курс: {info_about_faculty[i][3]}\n"
+                for i in range(len(info_about_faculty)))
+            bot.send_message(message.chat.id, f"Выберите номер группы:\n{output}")
+            bot.register_next_step_handler(message,
+                                           lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
+
+        except Exception as e:
+            bot.send_message(message.chat.id, f"Произошла ошибка: {str(e)}")
+
+        finally:
+            if 'connection' in locals():
+                connection.close()
     else:
-        bot.send_message(message.chat.id, "Такого номера нет, попробуйте ещё раз. Введите номер поля, которое хотите изменить:")
+        bot.send_message(message.chat.id,
+                         "Такого номера нет, попробуйте ещё раз. Введите номер поля, которое хотите изменить:")
         bot.register_next_step_handler(message, nomber_change)
 
-def changing_db_student(message, student_id, nomber):
-    new = message.text
+def changing_db_student(message, student_id, nomber, info_about_faculty):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     if nomber == '1':
+        new = message.text
         cursor.execute("UPDATE student SET name = ? WHERE student_id= ?", (new, student_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли ФИО")
         changing_student(message, student_id)
     elif nomber == "2":
+        new = message.text
         cursor.execute("UPDATE student SET phone_number = ? WHERE student_id= ?", (new, student_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли номер телефона")
         changing_student(message, student_id)
     elif nomber == "3":
+        new = message.text
         cursor.execute("UPDATE student SET mail = ? WHERE student_id= ?", (new, student_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли почту")
         changing_student(message, student_id)
     elif nomber == "4":
-        cursor.execute("UPDATE student SET faculty = ? WHERE student_id= ?", (new, student_id))
-        connection.commit()
-        connection.close()
-        bot.send_message(message.chat.id, "Вы поменяли факультет")
-        changing_student(message, student_id)
+        new = int(message.text)
+        if any(f[0] == new for f in info_about_faculty):
+            faculty = info_about_faculty[new - 1][1]
+            cursor.execute("UPDATE student SET faculty = ? WHERE student_id= ?", (faculty, student_id))
+            connection.commit()
+            connection.close()
+            bot.send_message(message.chat.id, "Вы поменяли факультет")
+            changing_student(message, student_id)
+        else:
+            bot.send_message(message.chat.id, "Вы ввели неверное значение, укажите Укажите ваш Факультет:")
+            bot.register_next_step_handler(message,
+                                           lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "5":
+        new = message.text
         if new == "1" or new == "2" or new == "3" or new == "4":
             cursor.execute("UPDATE student SET course = ? WHERE student_id= ?", (new, student_id))
             connection.commit()
@@ -279,9 +328,12 @@ def changing_db_student(message, student_id, nomber):
             changing_student(message, student_id)
         else:
             bot.send_message(message.chat.id, "Вы ввели неверное значение, укажите ваш курс\nПример: 1")
-            bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber))
+            bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "6":
-        cursor.execute("UPDATE student SET group_number = ? WHERE student_id= ?", (new, student_id))
+        new = int(message.text)
+        if any(f[0] == new for f in info_about_faculty):
+            groupp = info_about_faculty[new - 1][1]
+        cursor.execute("UPDATE student SET group_number = ? WHERE student_id= ?", (groupp, student_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли номер группы")
@@ -385,8 +437,8 @@ def select_data_for_teacher(message, teacher_id):
         for i in range(len(info_about_discipline)))
     print(output)
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Поменять", callback_data="changing"))
-    markup.add(types.InlineKeyboardButton("Добавить", callback_data="add"))
+    markup.add(types.InlineKeyboardButton("Поменять наименование дисциплины", callback_data="changing"))
+    markup.add(types.InlineKeyboardButton("Добавить дисциплину", callback_data="add"))
     bot.send_message(message.chat.id, f"Дисциплины:\n{output}", reply_markup=markup)
 
 #МЕНЯЕМ НАЗВАНИЕ ДИСЦИПЛИНЫ
@@ -480,8 +532,8 @@ def spisok_grupp(message):
     connection.close()
     output = "".join(f"{groups[i][0]}) {groups[i][1]}, факультет: {groups[i][2]}, курс: {groups[i][3]}\n" for i in range(len(groups)))
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Поменять данные", callback_data="changing_group"))
-    markup.add(types.InlineKeyboardButton("Добавить данные", callback_data="add_group"))
+    markup.add(types.InlineKeyboardButton("Поменять группу", callback_data="changing_group"))
+    markup.add(types.InlineKeyboardButton("Добавить группу", callback_data="add_group"))
     if output:
         bot.send_message(message.chat.id, f"Все группы:\n{output}", reply_markup=markup)
     else:
@@ -543,11 +595,10 @@ def save_time(message, task_plan, user_id, regular):
     except ValueError:
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
-        bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id))
+        bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular))
 
 def save_task(message, task_plan, user_id, what_time, regular):
     date_time = message.text
-    regular = regular
     try:
         days, month = map(int, date_time.split('.'))
         print(month, days)
@@ -561,13 +612,14 @@ def save_task(message, task_plan, user_id, what_time, regular):
             bot.send_message(message.chat.id, "Задача добавлена!")
         else:
             bot.send_message(message.chat.id,
-                             f"Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+                             "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
             bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular))
-
     except ValueError:
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
         bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular))
+    except Exception as e:
+        bot.send_message(user_id, f"Произошла ошибка: {str(e)}")
 
 # БЛОК ДОБАВЛЕНИЯ НОВОЙ РЕГУЛЯРНОЙ ЗАДАЧИ
 @bot.message_handler(commands=['add_regular_task'])
