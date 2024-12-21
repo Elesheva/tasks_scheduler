@@ -67,19 +67,20 @@ def create_db():
     """)
     # Создание таблицы task_for_student
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS task_for_student (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            send_date TEXT,
-            send_time TEXT,
-            name_of_discipline TEXT,
-            the_task_for_student TEXT,
-            document BLOB,
-            group_number TEXT, 
-            teacher_id INTEGER, 
-            faculty TEXT,
-            course INTEGER
-        )
-    """)
+            CREATE TABLE IF NOT EXISTS task_for_student (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                send_date TEXT,
+                send_time TEXT,
+                name_of_discipline TEXT,
+                the_task_for_student TEXT,
+                document BLOB,
+                group_number TEXT, 
+                teacher_id INTEGER, 
+                faculty TEXT,
+                course INTEGER,
+                statys BOOLEAN
+            )
+        """)
 
     connection.commit()
     cursor.close()
