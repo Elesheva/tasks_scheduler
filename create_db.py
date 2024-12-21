@@ -82,6 +82,38 @@ def create_db():
             )
         """)
 
+    # Создание таблицы task_list (УЧЕБНАЯ ДЛЯ СТУДЕНТА)
+    cursor.execute("""
+             CREATE TABLE IF NOT EXISTS task_list (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 task_id INTEGER,
+                 student_id INTEGER,
+                 teacher_id INTEGER,
+                 name_of_discipline TEXT,
+                 the_task_for_student TEXT,
+                 task_time TEXT,
+                 date TEXT,
+                 group_number TEXT,
+                 complete BOOLEAN
+             )
+         """)
+
+    # Создание таблицы result (Результат для Преподавателя)
+    cursor.execute("""
+             CREATE TABLE IF NOT EXISTS result (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 student_id INTEGER,
+                 teacher_id INTEGER,
+                 name_of_discipline TEXT,
+                 the_task_for_student TEXT,
+                 document BLOB,
+                 task_time TEXT,
+                 date TEXT,
+                 group_number TEXT,
+                 complete BOOLEAN
+             )
+         """)
+
     connection.commit()
     cursor.close()
     connection.close()

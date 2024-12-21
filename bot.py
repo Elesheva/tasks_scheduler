@@ -1,5 +1,5 @@
 from os.path import lexists
-
+import os
 import telebot
 from pyexpat.errors import messages
 from telebot import types
@@ -773,10 +773,10 @@ def group_number_statys_teacher_1(message, task_plan, user_id, what_time, date_t
         bot.send_message(message.chat.id, "Пожалуйста, введите корректный номер группы.")
         bot.register_next_step_handler(message, lambda msg: group_number_statys_teacher_1(msg, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group))
         return
-    have = True
+    have = False
     for i in range(len(group)):
         if group[i][0] == id:
-            have = False
+            have = True
             group_number = group[i][1]
             course = group[i][3]
             bot.send_message(message.chat.id, "Загрузите задание: документ или текст.")
@@ -790,21 +790,46 @@ def group_number_statys_teacher_1(message, task_plan, user_id, what_time, date_t
                                        lambda msg: group_number_statys_teacher_1(msg, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group))
 def document_number_statys_teacher_1(message, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group_number, course):
     if message.document:
-        document = message.document
-        file_id = document.file_id
-        connection = sqlite3.connect('my_database.db')
-        cursor = connection.cursor()
-        cursor.execute(
-            'INSERT INTO task_for_student (send_date, send_time, name_of_discipline, the_task_for_student, document, group_number, teacher_id, faculty, course) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (date_time, what_time, name_of_discipline, task_plan, file_id, group_number, user_id, facultet, course))
-        connection.commit()
-        connection.close()
-        bot.send_message(message.chat.id,"Вся информация загружена.\nПосле отправки задания придёт уведомление.")
-        #ВЫВОД ЗАГРУЖЕНОЙ ИНФОРМАЦИИ
+        file_name = message.document.file_name
+        file_info = bot.get_file(message.document.file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(file_name, 'wb') as new_file:
+            new_file.write(downloaded_file)
+            connection = sqlite3.connect('my_database.db')
+            cursor = connection.cursor()
+            cursor.execute(
+                'INSERT INTO task_for_student (send_date, send_time, name_of_discipline, the_task_for_student, document, group_number, teacher_id, faculty, course) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                (date_time, what_time, name_of_discipline, task_plan, file_name, group_number, user_id, facultet, course))
+            connection.commit()
+            connection.close()
+            bot.send_message(message.chat.id,"Вся информация загружена.\nПосле отправки задания придёт уведомление.")
+            #ВЫВОД ЗАГРУЖЕНОЙ ИНФОРМАЦИИ
     else:
         bot.send_message(message.chat.id, "Пожалуйста, загрузите документ или текст.")
         bot.register_next_step_handler(message,
                                        lambda msg: document_number_statys_teacher_1(msg, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group_number, course))
+
+#ДЛЯ СТУДЕНТОВ
+@bot.message_handler(commands=['task_from_the_teacher'])
+def task_list(message):
+    student_id = message.chat.id
+    complete = 0
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("""
+            SELECT name_of_discipline, the_task_for_student, teacher_id
+            FROM task_list 
+            WHERE student_id = ? AND complete = ?""", (student_id, complete))
+    tasks = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    output = "".join(f"{i+1}) {tasks[i][0]}\nЗАДАЧА:\n{tasks[i][1]}\n" for i in range(len(tasks)))
+    print(output)
+    if len(output) != 0:
+        bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
+        bot.send_message(message.chat.id, output)
+    else:
+        bot.send_message(message.chat.id, f'{message.from_user.first_name} {message.from_user.last_name}, у вас нет задач:)')
 
 
 #ДОСТАЁМ ВСЕ ЗАДАЧИ ИЗ БД
@@ -877,8 +902,8 @@ def delete_tasks_from_db(message, proverka_id):
 #НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ
 def send_message_ga(user_id, message):
     bot.send_message(chat_id=user_id, text=message)
-    print(f"Отправлено сообщение '{message}' пользователю {user_id}")
 
+#ОТПРАВЛЕНИЕ ЗАДАЧИ СТУДЕНТА
 def check_tasks():
     conn = sqlite3.connect('my_database.db')
     cursor = conn.cursor()
@@ -907,6 +932,7 @@ def check_tasks():
     conn.commit()
     conn.close()
 
+#ОТПРАВЛЕНИЕ ЗАДАЧИ ПРЕПОДАВАТЕЛЯ
 def send_doc():
     conn = sqlite3.connect('my_database.db')
     cursor = conn.cursor()
@@ -933,11 +959,17 @@ def send_doc():
             for_student = cursor.fetchall()
             for student in for_student:
                 student_id = student[0]
-                send_message_ga(student_id, f"{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\n{document}")
+                send_message_ga(student_id, f"{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\n")
+                bot.send_document(student_id, open(f"{document}", "rb"))
+                os.remove(f"{document}")
                 cursor.execute("UPDATE task_for_student SET document = NULL WHERE id= ?", (id,))
-                send_message_ga(teacher_id, f"{name_of_discipline}\nЗадача{the_task_for_student}\n отправлена студентам группы {group_number}")
+                send_message_ga(teacher_id, f"{name_of_discipline}\nЗадача: {the_task_for_student}\n отправлена студентам группы {group_number}")
+                cursor.execute(
+                    'INSERT INTO task_list (student_id, teacher_id, name_of_discipline, the_task_for_student, group_number) VALUES (?, ?, ?, ?, ?)',
+                    (student_id, teacher_id, name_of_discipline, the_task_for_student, group_number))
                 conn.commit()
                 conn.close()
+
 
 
 scheduler = BackgroundScheduler()
