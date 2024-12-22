@@ -1,5 +1,6 @@
-from os.path import lexists
 import os
+from os.path import lexists
+
 import telebot
 from pyexpat.errors import messages
 from telebot import types
@@ -56,6 +57,14 @@ def registr(callback):
     if callback.data == "Добавить группу" or callback.data == "add_group":
         groap_table(callback.message)
 
+    if callback.data == "delete":
+        statys = 1
+        delete_user(callback.message, callback.message.chat.id, statys)
+    if callback.data == "deletee":
+        statys = 2
+        delete_user(callback.message, callback.message.chat.id, statys)
+    if callback.data == "ne_delete":
+        return
 
 def register_name (message):
     name = message.text
@@ -150,7 +159,7 @@ def course_student(message, name, student_id, phone_nomber, mail, gender, facult
         course = int(message.text)
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
-        cursor.execute("SELECT id, group_number, faculty, course FROM groups WHERE faculty = ?, course = ? ", (faculty, course))
+        cursor.execute("SELECT id, group_number, faculty, course FROM groups WHERE faculty = ? AND course = ? ", (faculty, course))
         info_about_faculty = cursor.fetchall()
         connection.commit()
         connection.close()
@@ -622,6 +631,84 @@ def changing_grouppp(message, nomber, nomber_group):
         bot.send_message(message.chat.id, "Вы ввели неверное значение. Укажите курс:")
         bot.register_next_step_handler(message, lambda msg:changing_grouppp(msg, nomber, nomber_group))
 
+#Удаляем учётную запись
+@bot.message_handler(commands=['delete_account'])
+def delete_zapis(message):
+    user_id = message.chat.id
+    # ПРОВЕРКА РЕГИСТРАЦИИ ПОЛЬЗОВАТЕЛЯ
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (user_id,))
+    count_teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (user_id,))
+    count_student = cursor.fetchone()[0]
+    if count_teacher > 0 and count_student > 0:
+        bot.send_message(message.chat.id,
+                         f"У вас две учётные записи. Вы зарегистрированы и как студент и как преподаватель.\nКакую хотите удалить?\n1. Преподаватель\n2. Студент ")
+        bot.register_next_step_handler(message, lambda  msg: teacher_or_student_account(msg, user_id))
+    elif count_teacher > 0 and count_student == 0:
+        cursor.execute("SELECT name, phone_number, mail, department FROM teachers WHERE teacher_id = ?", (user_id,))
+        info_about_teacher = cursor.fetchall()
+        connection.commit()
+        connection.close()
+        output = "".join(
+            f"Ваши данные:\n1) Имя: {info_about_teacher[i][0]}\n2) Номер телефона: {info_about_teacher[i][1]}\n3) Почта: {info_about_teacher[i][2]}\n4) Кафедра: {info_about_teacher[i][3]}"
+            for i in range(len(info_about_teacher)))
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Да", callback_data="delete"))
+        markup.add(types.InlineKeyboardButton("Нет", callback_data="ne_delete"))
+        bot.send_message(message.chat.id, f"У вас есть 1 учётная запись,\n{output}\n хотите удалить?", reply_markup=markup)
+    elif count_teacher == 0 and count_student > 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Да", callback_data="deletee"))
+        markup.add(types.InlineKeyboardButton("Нет", callback_data="ne_delete"))
+        cursor.execute(
+            "SELECT name, phone_number, mail, faculty, course, group_number FROM student WHERE student_id = ?",
+            (user_id,))
+        info_about_student = cursor.fetchall()
+        connection.commit()
+        connection.close()
+        output = "".join(
+            f"Ваши данные:\n1) Имя: {info_about_student[i][0]}\n2) Номер телефона: {info_about_student[i][1]}\n3) Почта: {info_about_student[i][2]}\n4) Факультет: {info_about_student[i][3]}\n5) Курс: {info_about_student[i][4]}\n6) Номер группы: {info_about_student[i][5]}"
+            for i in range(len(info_about_student)))
+        bot.send_message(message.chat.id, f"У вас есть 1 учётная запись,\n{output}\n хотите удалить?", reply_markup=markup)
+    else:
+        connection.commit()
+        connection.close()
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "У вас нет учётной записи. Хотите зарегистрироваться?",
+                         reply_markup=markup)
+
+def teacher_or_student_account(message, user_id):
+    statys = message.text
+    if statys == "1":
+        statys = int(statys)
+        delete_user(message, user_id, statys)
+    elif statys == "2":
+        statys = int(statys)
+        delete_user(message, user_id, statys)
+    else:
+        bot.send_message(message.chat.id, "Вы ввели неверное значение")
+
+def delete_user(message, user_id, statys):
+    if statys == 1:
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM teachers WHERE teacher_id = ?", (user_id,))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id,
+                         f"Ваша учётная запись удалена")
+    if statys == 2:
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM student WHERE student_id= ?", (user_id,))
+        connection.commit()
+        connection.close()
+        bot.send_message(message.chat.id,
+                         f"Ваша учётная запись удалена")
 
 # ДОБАВЛЕНИЕ РЕГУЛЯРНОЙ (СТУДЕНТ) И НЕРЕГЕГУЛЯРНОЙ ЗАДАЧИ (СТУДЕНТ И ПРЕПОДАВАТЕЛЬ)
 @bot.message_handler(commands=['add_regular_task', 'add_task'])
@@ -641,10 +728,10 @@ def new_task(message):
     count_teacher = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (user_id,))
     count_student = cursor.fetchone()[0]
+    connection.commit()
+    connection.close()
     if count_teacher > 0 and count_student > 0:
-        bot.send_message(message.chat.id,
-                         "У вас две учётные записи. Вы зарегистрированы и как студент и как преподаватель. Необходимо удалить неверную учётную запись.")
-        # Функция удаления уч. записи
+        delete_zapis(message)
     elif count_teacher > 0 and count_student == 0:
         statys = 1
         bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
@@ -657,7 +744,7 @@ def new_task(message):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
         bot.send_message(message.chat.id,
-                         "У вас нет учётные записи. Для того, чтобы создать задачу необходимо зарегистрироваться." , reply_markup= markup)
+                         "У вас нет учётной записи. Для того, чтобы создать задачу необходимо зарегистрироваться." , reply_markup= markup)
 
 def whattime(message, user_id, regular, statys):
     regular = regular
@@ -693,20 +780,37 @@ def save_time(message, task_plan, user_id, regular, statys):
 def save_task(message, task_plan, user_id, what_time, regular, statys):
     date_time = message.text
     if statys == 1:
-        connection = sqlite3.connect('my_database.db')
-        cursor = connection.cursor()
-        cursor.execute("SELECT id, name_of_discipline,faculty FROM discipline WHERE teacher_id = ?", (user_id,))
-        discipline = cursor.fetchall()
-        connection.commit()
-        connection.close()
-        output = "".join(f"{discipline[i][0]}) {discipline[i][1]}, факультет: {discipline[i][2]}" for i in
-                         range(len(discipline)))
-        if output:
-            bot.send_message(message.chat.id, f"Выберите дисциплину:{output}")
-            bot.register_next_step_handler(message,
-                                           lambda msg: discipline_number_statys_teacher_1(msg, task_plan, user_id, what_time, date_time, discipline))
-        else:
-            bot.send_message(message.chat.id, f"Вы ещё не добавили дисциплину.")
+        try:
+            days, month = map(int, date_time.split('.'))
+            print(month, days)
+            if 1 <= month <= 12 and 1 <= days < 32:
+                connection = sqlite3.connect('my_database.db')
+                cursor = connection.cursor()
+                cursor.execute("SELECT id, name_of_discipline,faculty FROM discipline WHERE teacher_id = ?", (user_id,))
+                discipline = cursor.fetchall()
+                connection.commit()
+                connection.close()
+                output = "".join(f"{discipline[i][0]}) {discipline[i][1]}, факультет: {discipline[i][2]}" for i in
+                                 range(len(discipline)))
+                if output:
+                    bot.send_message(message.chat.id, f"Выберите дисциплину:{output}")
+                    bot.register_next_step_handler(message,
+                                                   lambda msg: discipline_number_statys_teacher_1(msg, task_plan,
+                                                                                                  user_id, what_time,
+                                                                                                  date_time,
+                                                                                                  discipline))
+                else:
+                    bot.send_message(message.chat.id, f"Вы ещё не добавили дисциплину.")
+            else:
+                bot.send_message(message.chat.id,
+                                 "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+                bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
+        except ValueError:
+            bot.send_message(user_id,
+                             "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+            bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
+        except Exception as e:
+            bot.send_message(user_id, f"Произошла ошибка: {str(e)}")
     if statys == 2:
         try:
             days, month = map(int, date_time.split('.'))
@@ -813,23 +917,20 @@ def document_number_statys_teacher_1(message, task_plan, user_id, what_time, dat
 @bot.message_handler(commands=['task_from_the_teacher'])
 def task_list(message):
     student_id = message.chat.id
-    complete = 0
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("""
-            SELECT name_of_discipline, the_task_for_student, teacher_id
-            FROM task_list 
-            WHERE student_id = ? AND complete = ?""", (student_id, complete))
+    cursor.execute("SELECT name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ", (student_id,))
     tasks = cursor.fetchall()
+    print(tasks)
     connection.commit()
     connection.close()
-    output = "".join(f"{i+1}) {tasks[i][0]}\nЗАДАЧА:\n{tasks[i][1]}\n" for i in range(len(tasks)))
+    output = "".join(f"{i+1}) {tasks[i][0]}\nЗАДАЧА:\n{tasks[i][1]}, не выполнено\n" for i in range(len(tasks)))
     print(output)
-    if len(output) != 0:
-        bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
+    if tasks:
+        bot.send_message(message.chat.id, f"{message.from_user.first_name}, все ваши задачи:")
         bot.send_message(message.chat.id, output)
     else:
-        bot.send_message(message.chat.id, f'{message.from_user.first_name} {message.from_user.last_name}, у вас нет задач:)')
+        bot.send_message(message.chat.id, f'{message.from_user.first_name}, у вас нет задач от преподавателя.')
 
 
 #ДОСТАЁМ ВСЕ ЗАДАЧИ ИЗ БД
@@ -961,14 +1062,16 @@ def send_doc():
                 student_id = student[0]
                 send_message_ga(student_id, f"{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\n")
                 bot.send_document(student_id, open(f"{document}", "rb"))
-                os.remove(f"{document}")
-                cursor.execute("UPDATE task_for_student SET document = NULL WHERE id= ?", (id,))
-                send_message_ga(teacher_id, f"{name_of_discipline}\nЗадача: {the_task_for_student}\n отправлена студентам группы {group_number}")
                 cursor.execute(
-                    'INSERT INTO task_list (student_id, teacher_id, name_of_discipline, the_task_for_student, group_number) VALUES (?, ?, ?, ?, ?)',
-                    (student_id, teacher_id, name_of_discipline, the_task_for_student, group_number))
-                conn.commit()
-                conn.close()
+                    'INSERT INTO task_list (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number) VALUES (?, ?, ?, ?, ?, ?)',
+                    (id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number))
+            send_message_ga(teacher_id,
+                            f"{name_of_discipline}\nЗадача: {the_task_for_student}\n отправлена студентам группы {group_number}")
+            cursor.execute("UPDATE task_for_student SET document = NULL WHERE id= ?", (id,))
+            os.remove(f"{document}")
+    conn.commit()
+    conn.close()
+
 
 
 
@@ -980,7 +1083,6 @@ scheduler.start()
 
 
 bot.polling(none_stop=True)
-
 
 
 
