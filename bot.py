@@ -14,7 +14,7 @@ from pytz import utc
 
 from apscheduler.schedulers.background import BackgroundScheduler
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 bot = telebot.TeleBot('7206218529:AAGXx1IkHVxZ3IrFt09Xgzytanj1n-bpcUI')
@@ -65,6 +65,11 @@ def registr(callback):
         delete_user(callback.message, callback.message.chat.id, statys)
     if callback.data == "ne_delete":
         return
+
+    if callback.data == "send_completed_task":
+        bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер задания, которое хотите отправить:")
+        bot.register_next_step_handler(callback.message, lambda msg: send_task_for_teacher(msg, callback.message.chat.id))
+
 
 def register_name (message):
     name = message.text
@@ -883,7 +888,7 @@ def group_number_statys_teacher_1(message, task_plan, user_id, what_time, date_t
             have = True
             group_number = group[i][1]
             course = group[i][3]
-            bot.send_message(message.chat.id, "Загрузите задание: документ или текст.")
+            bot.send_message(message.chat.id, "Загрузите документ с заданием")
             bot.register_next_step_handler(message,
                                            lambda msg: document_number_statys_teacher_1(msg, task_plan, user_id, what_time,
                                                                                       date_time,
@@ -909,7 +914,7 @@ def document_number_statys_teacher_1(message, task_plan, user_id, what_time, dat
             bot.send_message(message.chat.id,"Вся информация загружена.\nПосле отправки задания придёт уведомление.")
             #ВЫВОД ЗАГРУЖЕНОЙ ИНФОРМАЦИИ
     else:
-        bot.send_message(message.chat.id, "Пожалуйста, загрузите документ или текст.")
+        bot.send_message(message.chat.id, "Пожалуйста, загрузите документ.")
         bot.register_next_step_handler(message,
                                        lambda msg: document_number_statys_teacher_1(msg, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group_number, course))
 
@@ -919,19 +924,66 @@ def task_list(message):
     student_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("SELECT name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ", (student_id,))
+    cursor.execute("SELECT id, name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ", (student_id,))
     tasks = cursor.fetchall()
-    print(tasks)
     connection.commit()
     connection.close()
-    output = "".join(f"{i+1}) {tasks[i][0]}\nЗАДАЧА:\n{tasks[i][1]}, не выполнено\n" for i in range(len(tasks)))
+    output = "".join(f"{i+1}) {tasks[i][1]}\nЗАДАЧА:\n{tasks[i][2]}, не выполнено\n" for i in range(len(tasks)))
     print(output)
     if tasks:
-        bot.send_message(message.chat.id, f"{message.from_user.first_name}, все ваши задачи:")
-        bot.send_message(message.chat.id, output)
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Отправить решение преподавателю", callback_data="send_completed_task"))
+        bot.send_message(message.chat.id, f"{message.from_user.first_name}, все ваши задачи:\n{output}", reply_markup= markup)
     else:
         bot.send_message(message.chat.id, f'{message.from_user.first_name}, у вас нет задач от преподавателя.')
 
+def send_task_for_teacher(message, student_id):
+    try:
+        nomber = int(message.text)
+    except ValueError:
+        bot.send_message(student_id,
+                         "Неверный номер. Попробуйте ещё раз:")
+        bot.register_next_step_handler(message,
+                                       lambda msg: send_task_for_teacher(msg, student_id))
+        return
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT id FROM task_list WHERE student_id = ? AND complete IS NULL ", (student_id,))
+    tasks = cursor.fetchall()
+    if not tasks:
+        bot.send_message(message.chat.id, f'{message.from_user.first_name}, у вас нет незавершенных задач.')
+        return
+    if nomber < 1 or nomber > len(tasks):
+        bot.send_message(message.chat.id,
+                         f'{message.from_user.first_name}, введённый номер задачи вне диапазона.')
+        return
+    tasks_id = tasks[nomber-1][0]
+    bot.send_message(message.chat.id, f"{message.from_user.first_name}, отправьте файл с решением задачи")
+    connection.commit()
+    connection.close()
+    bot.register_next_step_handler(message, lambda msg: send_document_for_teacher(msg, student_id, tasks_id))
+
+def send_document_for_teacher(message, student_id, tasks_id):
+    if message.document:
+        file_name = message.document.file_name
+        file_info = bot.get_file(message.document.file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(file_name, 'wb') as new_file:
+            new_file.write(downloaded_file)
+            now = datetime.now()
+            new_time = now + timedelta(minutes=2)
+            current_date = now.strftime("%d.%m")
+            current_time = new_time.strftime("%H:%M")
+            connection = sqlite3.connect('my_database.db')
+            cursor = connection.cursor()
+            cursor.execute("UPDATE task_list SET document = ?, task_time = ?, date = ? WHERE id = ?", (file_name, current_time, current_date, tasks_id,))
+            connection.commit()
+            connection.close()
+            bot.send_message(student_id, "Вся информация загружена.\nВаше решение будет отправлено преподавателю через 2 минуты.\nПосле отправки вам придёт уведомление")
+    else:
+        bot.send_message(message.chat.id, "Пожалуйста, загрузите документ.")
+        bot.register_next_step_handler(message,
+                                       lambda msg: send_document_for_teacher(msg, student_id, tasks_id))
 
 #ДОСТАЁМ ВСЕ ЗАДАЧИ ИЗ БД
 @bot.message_handler(commands=['all_tasks'])
@@ -1004,7 +1056,7 @@ def delete_tasks_from_db(message, proverka_id):
 def send_message_ga(user_id, message):
     bot.send_message(chat_id=user_id, text=message)
 
-#ОТПРАВЛЕНИЕ ЗАДАЧИ СТУДЕНТА
+#ОТПРАВЛЕНИЕ ПЕРСОНАЛЬНОЙ ЗАДАЧИ СТУДЕНТА
 def check_tasks():
     conn = sqlite3.connect('my_database.db')
     cursor = conn.cursor()
@@ -1066,19 +1118,55 @@ def send_doc():
                     'INSERT INTO task_list (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number) VALUES (?, ?, ?, ?, ?, ?)',
                     (id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number))
             send_message_ga(teacher_id,
-                            f"{name_of_discipline}\nЗадача: {the_task_for_student}\n отправлена студентам группы {group_number}")
+                            f"{name_of_discipline}\nЗадача: {the_task_for_student}\nотправлена студентам группы {group_number}")
             cursor.execute("UPDATE task_for_student SET document = NULL WHERE id= ?", (id,))
-            os.remove(f"{document}")
+        os.remove(f"{document}")
     conn.commit()
     conn.close()
 
-
+#ОТПРАВКА РЕШЕНЁННОГО ЗАДАНИЯ ПРЕПОДАВАТЕЛЮ
+def send_doc_for_teacher():
+    conn = sqlite3.connect('my_database.db')
+    cursor = conn.cursor()
+    now = datetime.now()
+    current_time = now.strftime("%H:%M")
+    current_date = now.strftime("%d.%m")
+    cursor.execute("""
+            SELECT task_id, student_id, name_of_discipline, teacher_id, the_task_for_student, document, group_number, complete
+            FROM task_list 
+            WHERE task_time = ? AND date = ? """, (current_time, current_date))
+    tasks = cursor.fetchall()
+    for task in tasks:
+        task_id, student_id, name_of_discipline, teacher_id, the_task_for_student, document, group_number, complete = task
+        if not complete:
+            cursor.execute("""
+                UPDATE task_list 
+                SET complete = 1 
+                WHERE task_id = ?
+            """, (task_id,))
+            cursor.execute("""
+                    SELECT name 
+                    FROM student 
+                    WHERE student_id = ? """, (student_id,))
+            name_student = cursor.fetchall()
+            for name in name_student:
+                student_name = name[0]
+                send_message_ga(teacher_id, f"Решение задачи №{task_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nОт студента:{student_name} группа {group_number} ")
+                bot.send_document(teacher_id, open(f"{document}", "rb"))
+                cursor.execute("UPDATE task_list SET name_student = ? WHERE task_id = ?", (student_name, task_id))
+            send_message_ga(student_id,
+                            f"{name_of_discipline}\nРешение задачи: {the_task_for_student}\n отправлено.")
+            cursor.execute("UPDATE task_list SET document = NULL WHERE task_id = ?", (task_id,))
+        os.remove(f"{document}")
+    conn.commit()
+    conn.close()
 
 
 scheduler = BackgroundScheduler()
 # Запланируем выполнение функции check_tasks каждую минуту
 scheduler.add_job(check_tasks, 'interval', minutes=1)
 scheduler.add_job(send_doc,'interval', minutes=1)
+scheduler.add_job(send_doc_for_teacher,'interval', minutes=1)
 scheduler.start()
 
 
