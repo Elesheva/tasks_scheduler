@@ -85,6 +85,38 @@ def registr(callback):
         bot.register_next_step_handler(callback.message,
                                        lambda msg: send_comment(msg, callback.message.chat.id))
 
+    if callback.data.startswith("neyd"):
+        perems_str = callback.data[4:]
+        perems = perems_str.split('-')
+        mark = 2
+        bot.send_message(callback.message.chat.id,
+                         "Напишите комментарий по выполненной работе:")
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
+    if callback.data.startswith("ydovletvoritelno"):
+        perems_str = callback.data[16:]
+        perems = perems_str.split('-')
+        mark = 3
+        bot.send_message(callback.message.chat.id,
+                         "Напишите комментарий по выполненной работе:")
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
+    if callback.data.startswith("horosho"):
+        perems_str = callback.data[7:]
+        perems = perems_str.split('-')
+        mark = 4
+        bot.send_message(callback.message.chat.id,
+                         "Напишите комментарий по выполненной работе:")
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
+    if callback.data.startswith("otlichno"):
+        perems_str = callback.data[8:]
+        perems = perems_str.split('-')
+        mark = 5
+        bot.send_message(callback.message.chat.id,
+                         "Напишите комментарий по выполненной работе:")
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
 
 def register_name(message):
     name = message.text
@@ -847,20 +879,28 @@ def send_mark(message, teacher_id, nomber, info_complete_task):
         bot.send_message(teacher_id,
                          "Неверный номер. Попробуйте ещё раз:")
         bot.register_next_step_handler(message,
-                                       lambda msg: send_mark(msg, teacher_id, nomber))
+                                       lambda msg: send_mark(msg, teacher_id, nomber, info_complete_task))
         return
     have = False
     for i in range(len(info_complete_task)):
         if info_complete_task[i][0] == id:
             have = True
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("2 - неудовлетворительно", callback_data="neyd"))
-            markup.add(types.InlineKeyboardButton("3 - удовлетворительно", callback_data="ydovletvoritelno"))
-            markup.add(types.InlineKeyboardButton("4 - хорошо", callback_data="horosho"))
-            markup.add(types.InlineKeyboardButton("5 - отлично", callback_data="otlichno"))
+            markup.add(types.InlineKeyboardButton("2 - неудовлетворительно", callback_data=f"neyd{id}-{nomber}"))
+            markup.add(types.InlineKeyboardButton("3 - удовлетворительно", callback_data=f"ydovletvoritelno{id}-{nomber}"))
+            markup.add(types.InlineKeyboardButton("4 - хорошо", callback_data=f"horosho{id}-{nomber}"))
+            markup.add(types.InlineKeyboardButton("5 - отлично", callback_data=f"otlichno{id}-{nomber}"))
             bot.send_message(message.chat.id, f"Введите оценку:", reply_markup=markup)
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
+
+def ocenka(message, teacher_id, mark, id, nomber):
+    print(teacher_id, mark, id, nomber)
+    comment = message.text
+    #ВЫВОДИМ ПОЛНОСТЬЮ ПРЕПОДАВАТЕЛЮ ЕГО КОММЕНТАРИЙ
+    #ВЫВОДИМ КНОПКУ ПОМЕНЯТЬ
+    #ЗАПИСЫВАЕМ в БД
+
 
 # Удаляем учётную запись
 @bot.message_handler(commands=['delete_account'])
