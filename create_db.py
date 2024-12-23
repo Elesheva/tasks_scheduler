@@ -96,6 +96,7 @@ def create_db():
                  task_time TEXT,
                  date TEXT,
                  group_number TEXT,
+                 document BLOB,
                  complete BOOLEAN
              )
          """)

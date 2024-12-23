@@ -16,10 +16,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import sqlite3
 from datetime import datetime, timedelta
 
-
 bot = telebot.TeleBot('7206218529:AAGXx1IkHVxZ3IrFt09Xgzytanj1n-bpcUI')
 
-#ПРИВЕТСВИЕ И РЕГИСТРАЦИЯ
+
+# ПРИВЕТСВИЕ И РЕГИСТРАЦИЯ
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     create_db.create_db()
@@ -27,17 +27,20 @@ def send_welcome(message):
     markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
     lastname = message.from_user.last_name
     if lastname is None:
-        bot.send_message(message.chat.id, f"Здравствуйте, {message.from_user.first_name} 👋 Я ваш персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
-                         , reply_markup= markup)
+        bot.send_message(message.chat.id,
+                         f"Здравствуйте, {message.from_user.first_name} 👋 Я ваш персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
+                         , reply_markup=markup)
     else:
-        bot.send_message(message.chat.id, f"Здравствуйте, {message.from_user.first_name} {lastname} 👋 Я ваш персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
-                         , reply_markup= markup)
+        bot.send_message(message.chat.id,
+                         f"Здравствуйте, {message.from_user.first_name} {lastname} 👋 Я ваш персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
+                         , reply_markup=markup)
+
 
 @bot.callback_query_handler(func=lambda callback: True)
 def registr(callback):
     if callback.data == "registration" or callback.data == "Регистрация":
         bot.send_message(callback.message.chat.id, "Пожалуйста, введите свое ФИО")
-        bot.register_next_step_handler(callback.message,lambda msg: register_name(msg))
+        bot.register_next_step_handler(callback.message, lambda msg: register_name(msg))
     if callback.data == "Поменять данные" or callback.data == "changing_student":
         bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер поля, которое хотетите изменить")
         bot.register_next_step_handler(callback.message, lambda msg: nomber_change(msg))
@@ -68,31 +71,42 @@ def registr(callback):
 
     if callback.data == "send_completed_task":
         bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер задания, которое хотите отправить:")
-        bot.register_next_step_handler(callback.message, lambda msg: send_task_for_teacher(msg, callback.message.chat.id))
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: send_task_for_teacher(msg, callback.message.chat.id))
 
     if callback.data == "statystic":
-        bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер задания, по которому хотите увидеть статистику:")
+        bot.send_message(callback.message.chat.id,
+                         "Пожалуйста, введите номер задания, по которому хотите увидеть статистику:")
         bot.register_next_step_handler(callback.message,
-                                       lambda msg: statystics(msg,  callback.message.chat.id))
+                                       lambda msg: statystics(msg, callback.message.chat.id))
+    if callback.data == "send_mark":
+        bot.send_message(callback.message.chat.id,
+                         "Пожалуйста, введите номер задания, по которому хотите отправить оценку:")
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: send_comment(msg, callback.message.chat.id))
 
-def register_name (message):
+
+def register_name(message):
     name = message.text
-    bot.send_message(message.chat.id, f"{name}, вы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
+    bot.send_message(message.chat.id,
+                     f"{name}, вы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
     bot.register_next_step_handler(message, lambda msg: register_student(msg, name, message.chat.id))
 
-#РЕГИСТРАЦИЯ СТУДЕНТОВ
+
+# РЕГИСТРАЦИЯ СТУДЕНТОВ
 def register_student(message, name, student_id):
     if message.text == "1":
-        #ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+        # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
         cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (student_id,))
         count = cursor.fetchone()[0]
         if count > 0:
             bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
-            changing_student(message,student_id)
+            changing_student(message, student_id)
         else:
-            bot.send_message(message.chat.id, f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
+            bot.send_message(message.chat.id,
+                             f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
             bot.register_next_step_handler(message, lambda msg: student_nomber(msg, name, student_id))
     elif message.text == "2":
         print(2)
@@ -104,21 +118,26 @@ def register_student(message, name, student_id):
             bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
             changing_teacher(message, student_id)
         else:
-            bot.send_message(message.chat.id,f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
+            bot.send_message(message.chat.id,
+                             f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
             bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name, message.chat.id))
     else:
-        bot.send_message(message.chat.id, f"{name}, вы ввели неверное значение, попробуйте ещё раз.\nВы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
+        bot.send_message(message.chat.id,
+                         f"{name}, вы ввели неверное значение, попробуйте ещё раз.\nВы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
         bot.register_next_step_handler(message, lambda msg: register_student(msg, name, student_id))
+
 
 def student_nomber(message, name, student_id):
     phone_nomber = message.text
     bot.send_message(message.chat.id, f"{name}, введите вашу почту\nПример: plan_it@mail.com")
-    bot.register_next_step_handler(message, lambda msg: mail_student (msg, name, student_id, phone_nomber))
+    bot.register_next_step_handler(message, lambda msg: mail_student(msg, name, student_id, phone_nomber))
+
 
 def mail_student(message, name, student_id, phone_nomber):
     mail = message.text
     bot.send_message(message.chat.id, f"{name}, ваш пол:\n1. Мужской\n2. Женский\nВведите цифру с нужным вариантом:")
-    bot.register_next_step_handler(message, lambda msg: gender_student (msg, name, student_id, phone_nomber, mail))
+    bot.register_next_step_handler(message, lambda msg: gender_student(msg, name, student_id, phone_nomber, mail))
+
 
 def gender_student(message, name, student_id, phone_nomber, mail):
     gender = message.text
@@ -133,11 +152,13 @@ def gender_student(message, name, student_id, phone_nomber, mail):
             f"{info_about_faculty[i][0]}) {info_about_faculty[i][1]}\n"
             for i in range(len(info_about_faculty)))
         bot.send_message(message.chat.id, f"{name}, укажите ваш Факультет:\n{output} ")
-        bot.register_next_step_handler(message, lambda msg: faculty_student(msg, name, student_id, phone_nomber, mail, gender, info_about_faculty))
+        bot.register_next_step_handler(message,
+                                       lambda msg: faculty_student(msg, name, student_id, phone_nomber, mail, gender,
+                                                                   info_about_faculty))
     else:
         bot.send_message(message.chat.id,
                          f"{name}, вы ввели неверное значение\nваш пол:\n1. Мужской\n2. Женский\nВведите цифру с нужным вариантом:")
-        bot.register_next_step_handler(message, lambda msg: gender_student (msg, name, student_id, phone_nomber, mail))
+        bot.register_next_step_handler(message, lambda msg: gender_student(msg, name, student_id, phone_nomber, mail))
 
 
 def faculty_student(message, name, student_id, phone_nomber, mail, gender, info_about_faculty):
@@ -155,12 +176,15 @@ def faculty_student(message, name, student_id, phone_nomber, mail, gender, info_
             have = True
             faculty = info_about_faculty[i][1]
             bot.send_message(message.chat.id, f"{name}, укажите ваш курс\nПример: 1")
-            bot.register_next_step_handler(message, lambda msg: course_student(msg, name, student_id, phone_nomber, mail, gender, faculty))
+            bot.register_next_step_handler(message,
+                                           lambda msg: course_student(msg, name, student_id, phone_nomber, mail, gender,
+                                                                      faculty))
     if not have:
         bot.send_message(message.chat.id, "Неверный номер факультета. Пожалуйста, попробуйте снова.")
         bot.register_next_step_handler(message,
                                        lambda msg: faculty_student(msg, name, student_id, phone_nomber, mail, gender,
                                                                    info_about_faculty))
+
 
 def course_student(message, name, student_id, phone_nomber, mail, gender, faculty):
     course = message.text
@@ -168,7 +192,8 @@ def course_student(message, name, student_id, phone_nomber, mail, gender, facult
         course = int(message.text)
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
-        cursor.execute("SELECT id, group_number, faculty, course FROM groups WHERE faculty = ? AND course = ? ", (faculty, course))
+        cursor.execute("SELECT id, group_number, faculty, course FROM groups WHERE faculty = ? AND course = ? ",
+                       (faculty, course))
         info_about_faculty = cursor.fetchall()
         connection.commit()
         connection.close()
@@ -177,13 +202,18 @@ def course_student(message, name, student_id, phone_nomber, mail, gender, facult
             for i in range(len(info_about_faculty)))
         if info_about_faculty:
             bot.send_message(message.chat.id, f"{name}, выберите номер группы:\n{output} ")
-            bot.register_next_step_handler(message,lambda msg: group_number(msg, name, student_id, phone_nomber, mail, gender, faculty, course, info_about_faculty))
+            bot.register_next_step_handler(message,
+                                           lambda msg: group_number(msg, name, student_id, phone_nomber, mail, gender,
+                                                                    faculty, course, info_about_faculty))
         else:
             bot.send_message(message.chat.id, f"{name}, к сожалению, группа пока не создана.")
     else:
         bot.send_message(message.chat.id,
                          f"{name}, вы ввели неверное значение, укажите ваш курс.\nПример: 1")
-        bot.register_next_step_handler(message, lambda msg: course_student(msg, name, student_id, phone_nomber, mail, gender, faculty))
+        bot.register_next_step_handler(message,
+                                       lambda msg: course_student(msg, name, student_id, phone_nomber, mail, gender,
+                                                                  faculty))
+
 
 def group_number(message, name, student_id, phone_nomber, mail, gender, faculty, course, info_about_faculty):
     try:
@@ -203,8 +233,9 @@ def group_number(message, name, student_id, phone_nomber, mail, gender, faculty,
             group = info_about_faculty[i][1]
             connection = sqlite3.connect('my_database.db')
             cursor = connection.cursor()
-            cursor.execute('INSERT INTO student (student_id, name, phone_number, mail, gender, faculty, course, group_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                           (student_id, name, phone_nomber, mail, gender, faculty, course, group))
+            cursor.execute(
+                'INSERT INTO student (student_id, name, phone_number, mail, gender, faculty, course, group_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                (student_id, name, phone_nomber, mail, gender, faculty, course, group))
             connection.commit()
             connection.close()
             bot.send_message(message.chat.id, "Вы зарегистрированы!")
@@ -216,50 +247,64 @@ def group_number(message, name, student_id, phone_nomber, mail, gender, faculty,
                                        lambda msg: group_number(msg, name, student_id, phone_nomber, mail, gender,
                                                                 faculty, course, info_about_faculty))
 
-#РЕГИСТРАЦИЯ ПРЕПОДАВАТЕЛЯ
+
+# РЕГИСТРАЦИЯ ПРЕПОДАВАТЕЛЯ
 def register_teacher(message, name, teacher_id):
     teacher_phone_nomber = message.text
     bot.send_message(message.chat.id, f"{name}, введите вашу почту\nПример: plan_it@mail.com")
-    bot.register_next_step_handler(message, lambda msg: mail_teacher (msg, name, teacher_id, teacher_phone_nomber))
+    bot.register_next_step_handler(message, lambda msg: mail_teacher(msg, name, teacher_id, teacher_phone_nomber))
+
 
 def mail_teacher(message, name, teacher_id, teacher_phone_nomber):
     mail = message.text
     bot.send_message(message.chat.id, f"{name}, ваш пол:\n1. Мужской\n2. Женский\nВведите цифру с нужным вариантом:")
-    bot.register_next_step_handler(message, lambda msg: gender_teacher (msg, name, teacher_id, teacher_phone_nomber, mail))
+    bot.register_next_step_handler(message,
+                                   lambda msg: gender_teacher(msg, name, teacher_id, teacher_phone_nomber, mail))
+
 
 def gender_teacher(message, name, teacher_id, teacher_phone_nomber, mail):
     gender = message.text
     if gender == "1" or gender == "2":
         bot.send_message(message.chat.id, f"{name}, укажите наименование вашей кафедры\nПример: Информационные системы")
-        bot.register_next_step_handler(message, lambda msg: department_teacher(msg, name, teacher_id, teacher_phone_nomber, mail, gender))
+        bot.register_next_step_handler(message,
+                                       lambda msg: department_teacher(msg, name, teacher_id, teacher_phone_nomber, mail,
+                                                                      gender))
     else:
         bot.send_message(message.chat.id,
                          f"{name}, вы ввели неверное значение\nваш пол:\n1. Мужской\n2. Женский\nВведите цифру с нужным вариантом:")
-        bot.register_next_step_handler(message, lambda msg: gender_teacher (msg, name, teacher_id, teacher_phone_nomber, mail))
+        bot.register_next_step_handler(message,
+                                       lambda msg: gender_teacher(msg, name, teacher_id, teacher_phone_nomber, mail))
+
 
 def department_teacher(message, name, teacher_id, teacher_phone_nomber, mail, gender):
     department = message.text
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute('INSERT INTO teachers (teacher_id, name, phone_number, mail, gender, department) VALUES (?, ?, ?, ?, ?, ?)',
-                   (teacher_id, name, teacher_phone_nomber, mail, gender, department))
+    cursor.execute(
+        'INSERT INTO teachers (teacher_id, name, phone_number, mail, gender, department) VALUES (?, ?, ?, ?, ?, ?)',
+        (teacher_id, name, teacher_phone_nomber, mail, gender, department))
     connection.commit()
     connection.close()
     bot.send_message(message.chat.id, "Вы зарегистрированы!")
     changing_teacher(message, teacher_id)
 
-#ИЗМЕНЕНИЕ ДАННЫХ ДЛЯ СТУДЕНТОВ И ПРЕПОДАВАТЕЛЕЙ
+
+# ИЗМЕНЕНИЕ ДАННЫХ ДЛЯ СТУДЕНТОВ И ПРЕПОДАВАТЕЛЕЙ
 def changing_student(message, student_id):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("SELECT name, phone_number, mail, faculty, course, group_number FROM student WHERE student_id = ?", (student_id,))
+    cursor.execute("SELECT name, phone_number, mail, faculty, course, group_number FROM student WHERE student_id = ?",
+                   (student_id,))
     info_about_student = cursor.fetchall()
     connection.commit()
     connection.close()
-    output = "".join(f"Ваши данные:\n1) Имя: {info_about_student[i][0]}\n2) Номер телефона: {info_about_student[i][1]}\n3) Почта: {info_about_student[i][2]}\n4) Факультет: {info_about_student[i][3]}\n5) Курс: {info_about_student[i][4]}\n6) Номер группы: {info_about_student[i][5]}" for i in range(len(info_about_student)))
+    output = "".join(
+        f"Ваши данные:\n1) Имя: {info_about_student[i][0]}\n2) Номер телефона: {info_about_student[i][1]}\n3) Почта: {info_about_student[i][2]}\n4) Факультет: {info_about_student[i][3]}\n5) Курс: {info_about_student[i][4]}\n6) Номер группы: {info_about_student[i][5]}"
+        for i in range(len(info_about_student)))
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Поменять данные", callback_data="changing_student"))
-    bot.send_message(message.chat.id, output, reply_markup= markup)
+    bot.send_message(message.chat.id, output, reply_markup=markup)
+
 
 def nomber_change(message):
     nomber = message.text
@@ -273,22 +318,27 @@ def nomber_change(message):
     connection.close()
     if nomber == "1":
         bot.send_message(message.chat.id, "Пожалуйста, введите свое ФИО")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
+        bot.register_next_step_handler(message,
+                                       lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "2":
         bot.send_message(message.chat.id, "Пожалуйста, введите новый номер телефона:")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
+        bot.register_next_step_handler(message,
+                                       lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "3":
         bot.send_message(message.chat.id, "Пожалуйста, введите новый почтовый адрес:")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
+        bot.register_next_step_handler(message,
+                                       lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "4":
         output = "".join(
             f"{info_about_faculty[i][0]}) {info_about_faculty[i][1]}\n"
             for i in range(len(info_about_faculty)))
         bot.send_message(message.chat.id, f"Укажите ваш Факультет:\n{output} ")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
+        bot.register_next_step_handler(message,
+                                       lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "5":
         bot.send_message(message.chat.id, "Пожалуйста, введите номер курса:")
-        bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
+        bot.register_next_step_handler(message,
+                                       lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "6":
         try:
             connection = sqlite3.connect('my_database.db')
@@ -302,14 +352,15 @@ def nomber_change(message):
             for i in range(len(info_about_student)):
                 faculty = info_about_student[i][0]
                 course = info_about_student[i][1]
-            # Получаем информацию о группах
+                # Получаем информацию о группах
                 cursor.execute("SELECT id, group_number, faculty, course FROM groups WHERE faculty = ? AND course = ?",
                                (faculty, course))
                 info_about_faculty = cursor.fetchall()
             if not info_about_faculty:
                 bot.send_message(message.chat.id, "Группы не найдены.")
                 return
-            output = "".join(f"{info_about_faculty[i][0]}) {info_about_faculty[i][1]}, факультет: {info_about_faculty[i][2]}, курс: {info_about_faculty[i][3]}\n"
+            output = "".join(
+                f"{info_about_faculty[i][0]}) {info_about_faculty[i][1]}, факультет: {info_about_faculty[i][2]}, курс: {info_about_faculty[i][3]}\n"
                 for i in range(len(info_about_faculty)))
             bot.send_message(message.chat.id, f"Выберите номер группы:\n{output}")
             bot.register_next_step_handler(message,
@@ -324,6 +375,7 @@ def nomber_change(message):
         bot.send_message(message.chat.id,
                          "Такого номера нет, попробуйте ещё раз. Введите номер поля, которое хотите изменить:")
         bot.register_next_step_handler(message, nomber_change)
+
 
 def changing_db_student(message, student_id, nomber, info_about_faculty):
     connection = sqlite3.connect('my_database.db')
@@ -354,7 +406,8 @@ def changing_db_student(message, student_id, nomber, info_about_faculty):
             new = int(message.text)
         except ValueError:
             bot.send_message(message.chat.id, "Пожалуйста, введите корректный номер факультета.")
-            bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
+            bot.register_next_step_handler(message,
+                                           lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
             return
 
         have = False
@@ -383,13 +436,15 @@ def changing_db_student(message, student_id, nomber, info_about_faculty):
             changing_student(message, student_id)
         else:
             bot.send_message(message.chat.id, "Вы ввели неверное значение, укажите ваш курс\nПример: 1")
-            bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
+            bot.register_next_step_handler(message,
+                                           lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
     elif nomber == "6":
         try:
             new = int(message.text)
         except ValueError:
             bot.send_message(message.chat.id, "Вы ввели неверное значение, укажите группу:")
-            bot.register_next_step_handler(message, lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
+            bot.register_next_step_handler(message,
+                                           lambda msg: changing_db_student(msg, student_id, nomber, info_about_faculty))
             return
         have = False
         for i in range(len(info_about_faculty)):
@@ -407,7 +462,8 @@ def changing_db_student(message, student_id, nomber, info_about_faculty):
                                            lambda msg: changing_db_student(msg, student_id, nomber,
                                                                            info_about_faculty))
 
-def changing_teacher (message, teacher_id):
+
+def changing_teacher(message, teacher_id):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     cursor.execute("SELECT name, phone_number, mail, department FROM teachers WHERE teacher_id = ?", (teacher_id,))
@@ -419,7 +475,8 @@ def changing_teacher (message, teacher_id):
         for i in range(len(info_about_teacher)))
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Поменять данные ", callback_data="changing_teacher"))
-    bot.send_message(message.chat.id, output, reply_markup= markup)
+    bot.send_message(message.chat.id, output, reply_markup=markup)
+
 
 def nomber_change_teacher(message):
     nomber = message.text
@@ -437,8 +494,10 @@ def nomber_change_teacher(message):
         bot.send_message(message.chat.id, "Пожалуйста, введите название кафедры:")
         bot.register_next_step_handler(message, lambda msg: changing_db_teacher(msg, teacher_id, nomber))
     else:
-        bot.send_message(message.chat.id, "Такого номера нет, попробуйте ещё раз. Введите номер поля, которое хотетите изменить:")
+        bot.send_message(message.chat.id,
+                         "Такого номера нет, попробуйте ещё раз. Введите номер поля, которое хотетите изменить:")
         bot.register_next_step_handler(message, nomber_change_teacher)
+
 
 def changing_db_teacher(message, teacher_id, nomber):
     new = message.text
@@ -449,37 +508,40 @@ def changing_db_teacher(message, teacher_id, nomber):
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли ФИО")
-        changing_teacher (message, teacher_id)
+        changing_teacher(message, teacher_id)
     if nomber == "2":
         cursor.execute("UPDATE teachers SET phone_number = ? WHERE teacher_id= ?", (new, teacher_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли номер телефона")
-        changing_teacher (message, teacher_id)
+        changing_teacher(message, teacher_id)
     if nomber == "3":
         cursor.execute("UPDATE teachers SET mail = ? WHERE teacher_id= ?", (new, teacher_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли почту")
-        changing_teacher (message, teacher_id)
+        changing_teacher(message, teacher_id)
     if nomber == "4":
         cursor.execute("UPDATE teachers SET department = ? WHERE teacher_id= ?", (new, teacher_id))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли кафедру")
-        changing_teacher (message, teacher_id)
+        changing_teacher(message, teacher_id)
 
-#Функции для преподавателя
-#ДОБАВЛЕНИЕ ПРЕПОДАВАТЕЛЕМ ДАННЫХ В ТАБЛИЦУ ДИСЦИПЛИНА
+
+# Функции для преподавателя
+# ДОБАВЛЕНИЕ ПРЕПОДАВАТЕЛЕМ ДАННЫХ В ТАБЛИЦУ ДИСЦИПЛИНА
 @bot.message_handler(commands=['add_discipline'])
 def add_data_to_table_discipline(message):
     bot.send_message(message.chat.id, "Введите название вашей дисциплины:")
     bot.register_next_step_handler(message, lambda msg: to_table_discipline(msg, message.from_user.id))
 
+
 def to_table_discipline(message, teacher_id):
     name_discipline = message.text
     bot.send_message(message.chat.id, "Введите название факультета:")
     bot.register_next_step_handler(message, lambda msg: to_table_dis(msg, name_discipline, teacher_id))
+
 
 def to_table_dis(message, name_discipline, teacher_id):
     name_facyltet = message.text
@@ -492,7 +554,8 @@ def to_table_dis(message, name_discipline, teacher_id):
     bot.send_message(message.chat.id, f"Дисциплина создана")
     select_data_for_teacher(message, teacher_id)
 
-#ВЫВОДИМ СПИСОК ВСЕХ ДИСЦИПЛИН
+
+# ВЫВОДИМ СПИСОК ВСЕХ ДИСЦИПЛИН
 def select_data_for_teacher(message, teacher_id):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
@@ -509,16 +572,19 @@ def select_data_for_teacher(message, teacher_id):
     markup.add(types.InlineKeyboardButton("Добавить дисциплину", callback_data="add"))
     bot.send_message(message.chat.id, f"Дисциплины:\n{output}", reply_markup=markup)
 
-#МЕНЯЕМ НАЗВАНИЕ ДИСЦИПЛИНЫ
+
+# МЕНЯЕМ НАЗВАНИЕ ДИСЦИПЛИНЫ
 def nomber_change_discepline(message):
-    nomber= message.text
+    nomber = message.text
     bot.send_message(message.chat.id, "Пожалуйста, введите новое название дисциплины")
     bot.register_next_step_handler(message, lambda msg: changing_discepline(msg, nomber))
 
-def changing_discepline(message,  nomber):
+
+def changing_discepline(message, nomber):
     discepline = message.text
     bot.send_message(message.chat.id, "Пожалуйста, введите новое название факультета:")
-    bot.register_next_step_handler(message, lambda msg: changing_disceplineee(msg,nomber, discepline))
+    bot.register_next_step_handler(message, lambda msg: changing_disceplineee(msg, nomber, discepline))
+
 
 def changing_disceplineee(message, nomber, discepline):
     name_facyltet = message.text
@@ -536,14 +602,17 @@ def changing_disceplineee(message, nomber, discepline):
     if output:
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
-        cursor.execute("UPDATE discipline SET name_of_discipline = ?, faculty = ? WHERE id= ?", (discepline, name_facyltet, nomber))
+        cursor.execute("UPDATE discipline SET name_of_discipline = ?, faculty = ? WHERE id= ?",
+                       (discepline, name_facyltet, nomber))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Вы поменяли данные.")
         select_data_for_teacher(message, message.chat.id)
     else:
         bot.send_message(message.chat.id, "Нет данных с таким идентификатором.")
-#ДОБАВЛЯЕМ ГРУППУ
+
+
+# ДОБАВЛЯЕМ ГРУППУ
 @bot.message_handler(commands=['add_group'])
 def groap_table(message):
     teacher_id = message.chat.id
@@ -556,10 +625,12 @@ def groap_table(message):
     if not faculty:
         bot.send_message(message.chat.id, "Нет доступных факультетов.")
         return
-    output = "".join(f"{faculty[i][0]}) {faculty[i][1]}\n"for i in range(len(faculty)))
-    bot.send_message(message.chat.id, f"Вы создали следующие факультеты:\n{output}\nУкажите номер факультета, в котором создаётся группа:")
+    output = "".join(f"{faculty[i][0]}) {faculty[i][1]}\n" for i in range(len(faculty)))
+    bot.send_message(message.chat.id,
+                     f"Вы создали следующие факультеты:\n{output}\nУкажите номер факультета, в котором создаётся группа:")
     print(output)
     bot.register_next_step_handler(message, lambda msg: to_table_groap(msg, teacher_id, faculty))
+
 
 def to_table_groap(message, teacher_id, faculty):
     try:
@@ -586,29 +657,33 @@ def to_groap(message, teacher_id, facultet):
     bot.send_message(message.chat.id, "Укажите курс:")
     bot.register_next_step_handler(message, lambda msg: to_tableee_groap(msg, teacher_id, facultet, group))
 
+
 def to_tableee_groap(message, teacher_id, facultet, group):
     cyrs = message.text
     if cyrs == "1" or cyrs == "2" or cyrs == "3" or cyrs == "4":
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
         cursor.execute('INSERT INTO groups (group_number, faculty, course) VALUES (?, ?, ?)',
-                   (group, facultet, cyrs))
+                       (group, facultet, cyrs))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "Группа добавлена, теперь в неё могут добавляться студенты.")
         spisok_grupp(message)
     else:
         bot.send_message(message.chat.id, "Вы ввели неверное значение. Укажите курс:")
-        bot.register_next_step_handler(message, lambda msg:to_tableee_groap(msg, teacher_id, facultet, group))
-#ВЫВОДИМ СПИСОК ГРУПП
+        bot.register_next_step_handler(message, lambda msg: to_tableee_groap(msg, teacher_id, facultet, group))
+
+
+# ВЫВОДИМ СПИСОК ГРУПП
 def spisok_grupp(message):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute ("SELECT * FROM groups")
+    cursor.execute("SELECT * FROM groups")
     groups = cursor.fetchall()
     connection.commit()
     connection.close()
-    output = "".join(f"{groups[i][0]}) {groups[i][1]}, факультет: {groups[i][2]}, курс: {groups[i][3]}\n" for i in range(len(groups)))
+    output = "".join(f"{groups[i][0]}) {groups[i][1]}, факультет: {groups[i][2]}, курс: {groups[i][3]}\n" for i in
+                     range(len(groups)))
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Поменять группу", callback_data="changing_group"))
     markup.add(types.InlineKeyboardButton("Добавить группу", callback_data="add_group"))
@@ -617,16 +692,19 @@ def spisok_grupp(message):
     else:
         bot.send_message(message.chat.id, "Нет данных с таким идентификатором.")
 
-#МЕНЯЕМ НАЗВАНИЕ ГРУППЫ
+
+# МЕНЯЕМ НАЗВАНИЕ ГРУППЫ
 def nomber_change_group(message):
-    nomber= message.text
+    nomber = message.text
     bot.send_message(message.chat.id, "Пожалуйста, введите новый номер группы:")
     bot.register_next_step_handler(message, lambda msg: changing_group(msg, nomber))
+
 
 def changing_group(message, nomber):
     nomber_group = message.text
     bot.send_message(message.chat.id, "Пожалуйста, введите курс:")
     bot.register_next_step_handler(message, lambda msg: changing_grouppp(msg, nomber, nomber_group))
+
 
 def changing_grouppp(message, nomber, nomber_group):
     cyrs = message.text
@@ -634,33 +712,40 @@ def changing_grouppp(message, nomber, nomber_group):
         nomber = int(nomber)
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
-        cursor.execute ("UPDATE groups SET group_number = ?, course = ? WHERE id= ?", (nomber_group, cyrs, nomber))
+        cursor.execute("UPDATE groups SET group_number = ?, course = ? WHERE id= ?", (nomber_group, cyrs, nomber))
         connection.commit()
         connection.close()
         bot.send_message(message.chat.id, "вы поменяли данные.")
         spisok_grupp(message)
     else:
         bot.send_message(message.chat.id, "Вы ввели неверное значение. Укажите курс:")
-        bot.register_next_step_handler(message, lambda msg:changing_grouppp(msg, nomber, nomber_group))
+        bot.register_next_step_handler(message, lambda msg: changing_grouppp(msg, nomber, nomber_group))
 
-#ВЫВОДИМ СПИСОК СТУДЕНТОВ СДАВШИХ РАБОТУ
+
+# ВЫВОДИМ СПИСОК СТУДЕНТОВ СДАВШИХ И НЕ СДАВШИХ РАБОТУ
 @bot.message_handler(commands=['complete_task'])
 def complete_task(message):
     teacher_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND complete = 1 ", (teacher_id,))
+    cursor.execute(
+        "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1 ",
+        (teacher_id,))
     info_send_task = cursor.fetchall()
     connection.commit()
     connection.close()
     if info_send_task:
-        output = "".join(f"\n{info_send_task[i][0]}) {info_send_task[i][2]} {info_send_task[i][1]}\nЗадача:\n{info_send_task[i][3]}\nотправлено в {info_send_task[i][4]} {info_send_task[i][5]}" for i in
-                         range(len(info_send_task)))
+        output = "".join(
+            f"\n{info_send_task[i][0]}) {info_send_task[i][2]} {info_send_task[i][1]}\nЗадача:\n{info_send_task[i][3]}\nотправлено в {info_send_task[i][4]} {info_send_task[i][5]}"
+            for i in
+            range(len(info_send_task)))
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Статистика", callback_data="statystic"))
+        markup.add(types.InlineKeyboardButton("Отправить оценку", callback_data="send_mark"))
         bot.send_message(message.chat.id, f"Вы отправили задачи:{output}", reply_markup=markup)
     else:
         bot.send_message(message.chat.id, f"У вас пока нет отправленных задач.")
+
 
 def statystics(message, teacher_id):
     try:
@@ -674,33 +759,88 @@ def statystics(message, teacher_id):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     cursor.execute(
-        "SELECT name_student, group_number, task_time, date, the_task_for_student, name_of_discipline FROM task_list WHERE teacher_id = ? AND task_id = ? AND complete IS NULL ",
+        "SELECT name_student, group_number, the_task_for_student, name_of_discipline FROM task_list WHERE teacher_id = ? AND task_id = ? AND complete IS NULL",
         (teacher_id, nomber))
     info_dont_complete_task = cursor.fetchall()
-    cursor.execute("SELECT name_student, group_number, task_time, date, the_task_for_student, name_of_discipline FROM task_list WHERE teacher_id = ? AND task_id = ? AND complete = 1 ", (teacher_id, nomber))
+    cursor.execute(
+        "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1 ",
+        (teacher_id,))
+    info_send_task = cursor.fetchall()
+    cursor.execute(
+        "SELECT name_student, group_number, task_time, date, the_task_for_student, name_of_discipline FROM task_list WHERE teacher_id = ? AND task_id = ? AND complete = 1 ",
+        (teacher_id, nomber))
     info_complete_task = cursor.fetchall()
+    cursor.execute("SELECT COUNT (*) FROM task_list WHERE teacher_id = ? AND task_id = ? AND complete IS NULL",
+                   (teacher_id, nomber))
+    count_dont_complete_task = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM task_list WHERE teacher_id = ? AND task_id = ? AND complete = 1 ",
+                   (teacher_id, nomber))
+    count_complete_task = cursor.fetchone()[0]
     connection.commit()
     connection.close()
-    if info_complete_task:
-        output = "".join(f"\n{info_complete_task[i][0]}- {info_complete_task[i][1]}, {info_complete_task[i][5]}\nотправил(-ла) решение по задаче:\n{info_complete_task[i][4]}\nВ {info_complete_task[i][2]} {info_complete_task[i][3]}" for i in
-                         range(len(info_complete_task)))
-        bot.send_message(message.chat.id, f"РЕШЕНИЕ ОТПРАВЛЕНО:{output}")
-    else:
-        bot.send_message(message.chat.id, f"Нет решённых задач от студентов.")
-    if info_complete_task:
-        output = "".join(
-            f"\n{info_complete_task[i][0]}- {info_complete_task[i][1]}, {info_complete_task[i][5]}\nотправил(-ла) решение по задаче:\n{info_complete_task[i][4]}\nВ {info_complete_task[i][2]} {info_complete_task[i][3]}"
-            for i in
-            range(len(info_complete_task)))
-        bot.send_message(message.chat.id, f"РЕШЕНИЕ ОТПРАВЛЕНО:{output}")
-    else:
-        bot.send_message(message.chat.id, f"Нет решённых задач от студентов.")
+    have = False
+    for i in range(len(info_send_task)):
+        if info_send_task[i][0] == nomber:
+            have = True
+            if info_complete_task:
+                output = "".join(
+                    f"\n{info_complete_task[i][0]}- {info_complete_task[i][1]}, {info_complete_task[i][5]}\nотправил(-ла) решение по задаче:\n{info_complete_task[i][4]}\nВ {info_complete_task[i][2]} {info_complete_task[i][3]}"
+                    for i in
+                    range(len(info_complete_task)))
+                bot.send_message(message.chat.id, f"РЕШЕНИЕ ОТПРАВИЛИ {count_complete_task} студента(-ов):{output}")
+            else:
+                bot.send_message(message.chat.id, f"Нет решённых задач от студентов.")
+            if info_dont_complete_task:
+                out = "".join(
+                    f"\n{info_dont_complete_task[i][0]}- {info_dont_complete_task[i][1]}"
+                    for i in
+                    range(len(info_dont_complete_task)))
+                bot.send_message(message.chat.id, f"НЕ ОТПРАВИЛИ {count_dont_complete_task} студента(-ов): {out}")
+            else:
+                bot.send_message(message.chat.id, f"НЕ ОТПРАВИЛИ 0 студента(-ов)")
+    if not have:
+        bot.send_message(teacher_id, "Такого номера нет.")
 
 
+def send_comment(message, teacher_id):
+    try:
+        nomber = int(message.text)
+    except ValueError:
+        bot.send_message(teacher_id,
+                         "Неверный номер. Попробуйте ещё раз:")
+        bot.register_next_step_handler(message,
+                                       lambda msg: statystics(msg, teacher_id))
+        return
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1 ",
+        (teacher_id,))
+    info_send_task = cursor.fetchall()
+    have = False
+    for i in range(len(info_send_task)):
+        if info_send_task[i][0] == nomber:
+            have = True
+            cursor.execute(
+                "SELECT id, name_student, group_number, task_time, date, the_task_for_student, name_of_discipline FROM task_list WHERE teacher_id = ? AND task_id = ? AND complete = 1 ",
+                (teacher_id, nomber))
+            info_complete_task = cursor.fetchall()
+            if info_complete_task:
+                output = "".join(
+                    f"\n{info_complete_task[i][0]}) {info_complete_task[i][1]}- {info_complete_task[i][2]}, {info_complete_task[i][6]}\nотправил(-ла) решение по задаче:\n{info_complete_task[i][5]}\nВ {info_complete_task[i][3]} {info_complete_task[i][4]}"
+                    for i in
+                    range(len(info_complete_task)))
+                bot.send_message(message.chat.id, f"РЕШЕНИЕ ОТПРАВИЛИ:\n{output}")
+                bot.send_message(message.chat.id, f"Введите номер решения, по которому хотите отправить оценку:")
+            else:
+                bot.send_message(message.chat.id, f"Нет решённых задач от студентов.")
+    connection.commit()
+    connection.close()
+    if not have:
+        bot.send_message(teacher_id, "Такого номера нет.")
 
 
-
-#Удаляем учётную запись
+# Удаляем учётную запись
 @bot.message_handler(commands=['delete_account'])
 def delete_zapis(message):
     user_id = message.chat.id
@@ -714,7 +854,7 @@ def delete_zapis(message):
     if count_teacher > 0 and count_student > 0:
         bot.send_message(message.chat.id,
                          f"У вас две учётные записи. Вы зарегистрированы и как студент и как преподаватель.\nКакую хотите удалить?\n1. Преподаватель\n2. Студент ")
-        bot.register_next_step_handler(message, lambda  msg: teacher_or_student_account(msg, user_id))
+        bot.register_next_step_handler(message, lambda msg: teacher_or_student_account(msg, user_id))
     elif count_teacher > 0 and count_student == 0:
         cursor.execute("SELECT name, phone_number, mail, department FROM teachers WHERE teacher_id = ?", (user_id,))
         info_about_teacher = cursor.fetchall()
@@ -726,7 +866,8 @@ def delete_zapis(message):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Да", callback_data="delete"))
         markup.add(types.InlineKeyboardButton("Нет", callback_data="ne_delete"))
-        bot.send_message(message.chat.id, f"У вас есть 1 учётная запись,\n{output}\n хотите удалить?", reply_markup=markup)
+        bot.send_message(message.chat.id, f"У вас есть 1 учётная запись,\n{output}\n хотите удалить?",
+                         reply_markup=markup)
     elif count_teacher == 0 and count_student > 0:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Да", callback_data="deletee"))
@@ -740,7 +881,8 @@ def delete_zapis(message):
         output = "".join(
             f"Ваши данные:\n1) Имя: {info_about_student[i][0]}\n2) Номер телефона: {info_about_student[i][1]}\n3) Почта: {info_about_student[i][2]}\n4) Факультет: {info_about_student[i][3]}\n5) Курс: {info_about_student[i][4]}\n6) Номер группы: {info_about_student[i][5]}"
             for i in range(len(info_about_student)))
-        bot.send_message(message.chat.id, f"У вас есть 1 учётная запись,\n{output}\n хотите удалить?", reply_markup=markup)
+        bot.send_message(message.chat.id, f"У вас есть 1 учётная запись,\n{output}\n хотите удалить?",
+                         reply_markup=markup)
     else:
         connection.commit()
         connection.close()
@@ -749,6 +891,7 @@ def delete_zapis(message):
         bot.send_message(message.chat.id,
                          "У вас нет учётной записи. Хотите зарегистрироваться?",
                          reply_markup=markup)
+
 
 def teacher_or_student_account(message, user_id):
     statys = message.text
@@ -760,6 +903,7 @@ def teacher_or_student_account(message, user_id):
         delete_user(message, user_id, statys)
     else:
         bot.send_message(message.chat.id, "Вы ввели неверное значение")
+
 
 def delete_user(message, user_id, statys):
     if statys == 1:
@@ -778,6 +922,7 @@ def delete_user(message, user_id, statys):
         connection.close()
         bot.send_message(message.chat.id,
                          f"Ваша учётная запись удалена")
+
 
 # ДОБАВЛЕНИЕ РЕГУЛЯРНОЙ (СТУДЕНТ) И НЕРЕГЕГУЛЯРНОЙ ЗАДАЧИ (СТУДЕНТ И ПРЕПОДАВАТЕЛЬ)
 @bot.message_handler(commands=['add_regular_task', 'add_task'])
@@ -813,19 +958,22 @@ def new_task(message):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
         bot.send_message(message.chat.id,
-                         "У вас нет учётной записи. Для того, чтобы создать задачу необходимо зарегистрироваться." , reply_markup= markup)
+                         "У вас нет учётной записи. Для того, чтобы создать задачу необходимо зарегистрироваться.",
+                         reply_markup=markup)
+
 
 def whattime(message, user_id, regular, statys):
     regular = regular
     task_plan = message.text
-    #ПРЕПОДАВАТЕЛЬ
+    # ПРЕПОДАВАТЕЛЬ
     if statys == 1:
         bot.send_message(message.chat.id, "В какое время отправить задачу? (Например - 13:30)")
         bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys))
-    #СТУДЕНТ
+    # СТУДЕНТ
     elif statys == 2:
         bot.send_message(message.chat.id, "На какое время? (Например - 13:30)")
         bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys))
+
 
 def save_time(message, task_plan, user_id, regular, statys):
     regular = regular
@@ -834,8 +982,10 @@ def save_time(message, task_plan, user_id, regular, statys):
     try:
         hours, minutes = map(int, what_time.split(':'))
         if 0 <= hours < 24 and 0 <= minutes < 60:
-            bot.send_message(message.chat.id, "На какую дату хотите запланировать? Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
-            bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
+            bot.send_message(message.chat.id,
+                             "На какую дату хотите запланировать? Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+            bot.register_next_step_handler(message,
+                                           lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
         else:
             bot.send_message(message.chat.id,
                              f"Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
@@ -845,6 +995,7 @@ def save_time(message, task_plan, user_id, regular, statys):
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
         bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys))
+
 
 def save_task(message, task_plan, user_id, what_time, regular, statys):
     date_time = message.text
@@ -873,11 +1024,14 @@ def save_task(message, task_plan, user_id, what_time, regular, statys):
             else:
                 bot.send_message(message.chat.id,
                                  "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
-                bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
+                bot.register_next_step_handler(message,
+                                               lambda msg: save_task(msg, task_plan, user_id, what_time, regular,
+                                                                     statys))
         except ValueError:
             bot.send_message(user_id,
                              "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
-            bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
+            bot.register_next_step_handler(message,
+                                           lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
         except Exception as e:
             bot.send_message(user_id, f"Произошла ошибка: {str(e)}")
     if statys == 2:
@@ -887,24 +1041,29 @@ def save_task(message, task_plan, user_id, what_time, regular, statys):
             if 1 <= month <= 12 and 1 <= days < 32:
                 connection = sqlite3.connect('my_database.db')
                 cursor = connection.cursor()
-                cursor.execute('INSERT INTO tasks (user_id, task, task_time, date, regular_task) VALUES (?, ?, ?, ?, ?)',
-                               (user_id, task_plan, what_time, date_time, regular))
+                cursor.execute(
+                    'INSERT INTO tasks (user_id, task, task_time, date, regular_task) VALUES (?, ?, ?, ?, ?)',
+                    (user_id, task_plan, what_time, date_time, regular))
                 connection.commit()
                 connection.close()
                 bot.send_message(message.chat.id, "Задача добавлена!")
             else:
                 bot.send_message(message.chat.id,
                                  "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
-                bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
+                bot.register_next_step_handler(message,
+                                               lambda msg: save_task(msg, task_plan, user_id, what_time, regular,
+                                                                     statys))
         except ValueError:
             bot.send_message(user_id,
                              "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
-            bot.register_next_step_handler(message, lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
+            bot.register_next_step_handler(message,
+                                           lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
         except Exception as e:
             bot.send_message(user_id, f"Произошла ошибка: {str(e)}")
 
-#ДАЛЬШЕ ТОЛЬКО ДЛЯ ПРЕПОДАВАТЕЛЯ
-def discipline_number_statys_teacher_1 (message, task_plan, user_id, what_time, date_time, discipline):
+
+# ДАЛЬШЕ ТОЛЬКО ДЛЯ ПРЕПОДАВАТЕЛЯ
+def discipline_number_statys_teacher_1(message, task_plan, user_id, what_time, date_time, discipline):
     try:
         nomer = int(message.text)
     except ValueError:
@@ -930,21 +1089,31 @@ def discipline_number_statys_teacher_1 (message, task_plan, user_id, what_time, 
                              range(len(group)))
             if output:
                 bot.send_message(message.chat.id, f"Выберите группу:\n{output}")
-                bot.register_next_step_handler(message, lambda msg: group_number_statys_teacher_1 (msg, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group))
+                bot.register_next_step_handler(message,
+                                               lambda msg: group_number_statys_teacher_1(msg, task_plan, user_id,
+                                                                                         what_time, date_time,
+                                                                                         name_of_discipline, facultet,
+                                                                                         group))
             else:
                 bot.send_message(message.chat.id, f"Вы ещё не добавили группу.")
     if not have:
         bot.send_message(user_id,
                          "Неверный номер. Попробуйте ещё раз:")
         bot.register_next_step_handler(message,
-                                       lambda msg: discipline_number_statys_teacher_1 (msg, task_plan, user_id, what_time, date_time, discipline))
+                                       lambda msg: discipline_number_statys_teacher_1(msg, task_plan, user_id,
+                                                                                      what_time, date_time, discipline))
 
-def group_number_statys_teacher_1(message, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group):
+
+def group_number_statys_teacher_1(message, task_plan, user_id, what_time, date_time, name_of_discipline, facultet,
+                                  group):
     try:
         id = int(message.text)
     except ValueError:
         bot.send_message(message.chat.id, "Пожалуйста, введите корректный номер группы.")
-        bot.register_next_step_handler(message, lambda msg: group_number_statys_teacher_1(msg, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group))
+        bot.register_next_step_handler(message,
+                                       lambda msg: group_number_statys_teacher_1(msg, task_plan, user_id, what_time,
+                                                                                 date_time, name_of_discipline,
+                                                                                 facultet, group))
         return
     have = False
     for i in range(len(group)):
@@ -954,14 +1123,21 @@ def group_number_statys_teacher_1(message, task_plan, user_id, what_time, date_t
             course = group[i][3]
             bot.send_message(message.chat.id, "Загрузите документ с заданием")
             bot.register_next_step_handler(message,
-                                           lambda msg: document_number_statys_teacher_1(msg, task_plan, user_id, what_time,
-                                                                                      date_time,
-                                                                                      name_of_discipline, facultet, group_number, course))
+                                           lambda msg: document_number_statys_teacher_1(msg, task_plan, user_id,
+                                                                                        what_time,
+                                                                                        date_time,
+                                                                                        name_of_discipline, facultet,
+                                                                                        group_number, course))
     if not have:
         bot.send_message(message.chat.id, "Неверный номер. Попробуйте ещё раз:")
         bot.register_next_step_handler(message,
-                                       lambda msg: group_number_statys_teacher_1(msg, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group))
-def document_number_statys_teacher_1(message, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group_number, course):
+                                       lambda msg: group_number_statys_teacher_1(msg, task_plan, user_id, what_time,
+                                                                                 date_time, name_of_discipline,
+                                                                                 facultet, group))
+
+
+def document_number_statys_teacher_1(message, task_plan, user_id, what_time, date_time, name_of_discipline, facultet,
+                                     group_number, course):
     if message.document:
         file_name = message.document.file_name
         file_info = bot.get_file(message.document.file_id)
@@ -972,34 +1148,42 @@ def document_number_statys_teacher_1(message, task_plan, user_id, what_time, dat
             cursor = connection.cursor()
             cursor.execute(
                 'INSERT INTO task_for_student (send_date, send_time, name_of_discipline, the_task_for_student, document, group_number, teacher_id, faculty, course) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (date_time, what_time, name_of_discipline, task_plan, file_name, group_number, user_id, facultet, course))
+                (date_time, what_time, name_of_discipline, task_plan, file_name, group_number, user_id, facultet,
+                 course))
             connection.commit()
             connection.close()
-            bot.send_message(message.chat.id,"Вся информация загружена.\nПосле отправки задания придёт уведомление.")
-            #ВЫВОД ЗАГРУЖЕНОЙ ИНФОРМАЦИИ
+            bot.send_message(message.chat.id, "Вся информация загружена.\nПосле отправки задания придёт уведомление.")
+            # ВЫВОД ЗАГРУЖЕНОЙ ИНФОРМАЦИИ
     else:
         bot.send_message(message.chat.id, "Пожалуйста, загрузите документ.")
         bot.register_next_step_handler(message,
-                                       lambda msg: document_number_statys_teacher_1(msg, task_plan, user_id, what_time, date_time, name_of_discipline, facultet, group_number, course))
+                                       lambda msg: document_number_statys_teacher_1(msg, task_plan, user_id, what_time,
+                                                                                    date_time, name_of_discipline,
+                                                                                    facultet, group_number, course))
 
-#ДЛЯ СТУДЕНТОВ
+
+# ДЛЯ СТУДЕНТОВ
 @bot.message_handler(commands=['task_from_the_teacher'])
 def task_list(message):
     student_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("SELECT id, name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ", (student_id,))
+    cursor.execute(
+        "SELECT id, name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ",
+        (student_id,))
     tasks = cursor.fetchall()
     connection.commit()
     connection.close()
-    output = "".join(f"{i+1}) {tasks[i][1]}\nЗАДАЧА:\n{tasks[i][2]}, не выполнено\n" for i in range(len(tasks)))
+    output = "".join(f"{i + 1}) {tasks[i][1]}\nЗАДАЧА:\n{tasks[i][2]}, не выполнено\n" for i in range(len(tasks)))
     print(output)
     if tasks:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Отправить решение преподавателю", callback_data="send_completed_task"))
-        bot.send_message(message.chat.id, f"{message.from_user.first_name}, все ваши задачи:\n{output}", reply_markup= markup)
+        bot.send_message(message.chat.id, f"{message.from_user.first_name}, все ваши задачи:\n{output}",
+                         reply_markup=markup)
     else:
         bot.send_message(message.chat.id, f'{message.from_user.first_name}, у вас нет задач от преподавателя.')
+
 
 def send_task_for_teacher(message, student_id):
     try:
@@ -1021,11 +1205,12 @@ def send_task_for_teacher(message, student_id):
         bot.send_message(message.chat.id,
                          f'{message.from_user.first_name}, введённый номер задачи вне диапазона.')
         return
-    tasks_id = tasks[nomber-1][0]
+    tasks_id = tasks[nomber - 1][0]
     bot.send_message(message.chat.id, f"{message.from_user.first_name}, отправьте файл с решением задачи")
     connection.commit()
     connection.close()
     bot.register_next_step_handler(message, lambda msg: send_document_for_teacher(msg, student_id, tasks_id))
+
 
 def send_document_for_teacher(message, student_id, tasks_id):
     if message.document:
@@ -1035,21 +1220,24 @@ def send_document_for_teacher(message, student_id, tasks_id):
         with open(file_name, 'wb') as new_file:
             new_file.write(downloaded_file)
             now = datetime.now()
-            new_time = now + timedelta(minutes=2)
+            new_time = now + timedelta(minutes=1)
             current_date = now.strftime("%d.%m")
             current_time = new_time.strftime("%H:%M")
             connection = sqlite3.connect('my_database.db')
             cursor = connection.cursor()
-            cursor.execute("UPDATE task_list SET document = ?, task_time = ?, date = ? WHERE id = ?", (file_name, current_time, current_date, tasks_id,))
+            cursor.execute("UPDATE task_list SET document = ?, task_time = ?, date = ? WHERE id = ?",
+                           (file_name, current_time, current_date, tasks_id,))
             connection.commit()
             connection.close()
-            bot.send_message(student_id, "Вся информация загружена.\nВаше решение будет отправлено преподавателю через 2 минуты.\nПосле отправки вам придёт уведомление")
+            bot.send_message(student_id,
+                             "Вся информация загружена.\nВаше решение будет отправлено преподавателю через 1 минуту.\nПосле отправки вам придёт уведомление")
     else:
         bot.send_message(message.chat.id, "Пожалуйста, загрузите документ.")
         bot.register_next_step_handler(message,
                                        lambda msg: send_document_for_teacher(msg, student_id, tasks_id))
 
-#ДОСТАЁМ ВСЕ ЗАДАЧИ ИЗ БД
+
+# ДОСТАЁМ ВСЕ ЗАДАЧИ ИЗ БД
 @bot.message_handler(commands=['all_tasks'])
 def get_all_tasks_from_db(message):
     user_id = message.from_user.id
@@ -1060,22 +1248,25 @@ def get_all_tasks_from_db(message):
     print(tasks)
     connection.commit()
     connection.close()
-    output = "".join(f"{i+1}) {tasks[i][0]} в {tasks[i][1]}, {tasks[i][2]}\n" for i in range(len(tasks)))
+    output = "".join(f"{i + 1}) {tasks[i][0]} в {tasks[i][1]}, {tasks[i][2]}\n" for i in range(len(tasks)))
     print(output)
     if len(output) != 0:
-        bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
+        bot.send_message(message.chat.id,
+                         f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
         bot.send_message(message.chat.id, output)
     else:
-        bot.send_message(message.chat.id, f'{message.from_user.first_name} {message.from_user.last_name}, у вас нет задач:)')
+        bot.send_message(message.chat.id,
+                         f'{message.from_user.first_name} {message.from_user.last_name}, у вас нет задач:)')
 
-#УДАЛЕНИЕ ЗАДАЧИ ИЗ БД
+
+# УДАЛЕНИЕ ЗАДАЧИ ИЗ БД
 @bot.message_handler(commands=['delete_tasks'])
 def delete_task_from_db(message):
     user_id = message.from_user.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT (*) FROM tasks WHERE user_id = ?", (user_id,))
-    count = cursor.fetchone() [0]
+    count = cursor.fetchone()[0]
     if count > 0:
         cursor.execute("SELECT id, task, task_time, date FROM tasks WHERE user_id = ?", (user_id,))
         tasks = cursor.fetchall()
@@ -1085,12 +1276,14 @@ def delete_task_from_db(message):
         proverka_id = "".join(f"{x[0]} " for x in tasks)
         output = "".join(f"{x[0]} - {x[1]} в {x[2]}, {x[3]}\n" for x in tasks)
         print(output)
-        bot.send_message(message.chat.id, f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
+        bot.send_message(message.chat.id,
+                         f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
         bot.send_message(message.chat.id, output)
         bot.send_message(message.chat.id, "Напишите номер задачи, которую хотите удалить.")
         bot.register_next_step_handler(message, lambda msg: delete_tasks_from_db(msg, proverka_id))
     else:
         bot.send_message(message.chat.id, "У вас нет задач")
+
 
 def delete_tasks_from_db(message, proverka_id):
     id = message.text
@@ -1112,15 +1305,17 @@ def delete_tasks_from_db(message, proverka_id):
             connection.commit()
             connection.close()
             bot.send_message(message.chat.id, f"Задача {id} удалена")
-            bot.send_message(message.chat.id, "Список задач пуст." )
+            bot.send_message(message.chat.id, "Список задач пуст.")
     else:
         bot.send_message(message.chat.id, "Такого номера нет.")
 
-#НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ
+
+# НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ
 def send_message_ga(user_id, message):
     bot.send_message(chat_id=user_id, text=message)
 
-#ОТПРАВЛЕНИЕ ПЕРСОНАЛЬНОЙ ЗАДАЧИ СТУДЕНТА
+
+# ОТПРАВЛЕНИЕ ПЕРСОНАЛЬНОЙ ЗАДАЧИ СТУДЕНТА
 def check_tasks():
     conn = sqlite3.connect('my_database.db')
     cursor = conn.cursor()
@@ -1149,7 +1344,8 @@ def check_tasks():
     conn.commit()
     conn.close()
 
-#ОТПРАВЛЕНИЕ ЗАДАЧИ ПРЕПОДАВАТЕЛЯ
+
+# ОТПРАВЛЕНИЕ ЗАДАЧИ ПРЕПОДАВАТЕЛЯ
 def send_doc():
     conn = sqlite3.connect('my_database.db')
     cursor = conn.cursor()
@@ -1188,7 +1384,8 @@ def send_doc():
     conn.commit()
     conn.close()
 
-#ОТПРАВКА РЕШЕНЁННОГО ЗАДАНИЯ ПРЕПОДАВАТЕЛЮ
+
+# ОТПРАВКА РЕШЕНЁННОГО ЗАДАНИЯ ПРЕПОДАВАТЕЛЮ
 def send_doc_for_teacher():
     conn = sqlite3.connect('my_database.db')
     cursor = conn.cursor()
@@ -1215,7 +1412,8 @@ def send_doc_for_teacher():
             name_student = cursor.fetchall()
             for name in name_student:
                 student_name = name[0]
-                send_message_ga(teacher_id, f"Решение задачи №{task_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nОт студента:{student_name} группа {group_number} ")
+                send_message_ga(teacher_id,
+                                f"Решение задачи №{task_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nОт студента:{student_name} группа {group_number} ")
                 bot.send_document(teacher_id, open(f"{document}", "rb"))
                 cursor.execute("UPDATE task_list SET name_student = ? WHERE task_id = ?", (student_name, task_id))
             send_message_ga(student_id,
@@ -1229,10 +1427,9 @@ def send_doc_for_teacher():
 scheduler = BackgroundScheduler()
 # Запланируем выполнение функции check_tasks каждую минуту
 scheduler.add_job(check_tasks, 'interval', minutes=1)
-scheduler.add_job(send_doc,'interval', minutes=1)
-scheduler.add_job(send_doc_for_teacher,'interval', minutes=1)
+scheduler.add_job(send_doc, 'interval', minutes=1)
+scheduler.add_job(send_doc_for_teacher, 'interval', minutes=1)
 scheduler.start()
-
 
 bot.polling(none_stop=True)
 
