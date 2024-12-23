@@ -65,6 +65,7 @@ def create_db():
             course INTEGER
         )
     """)
+
     # Создание таблицы task_for_student
     cursor.execute("""
             CREATE TABLE IF NOT EXISTS task_for_student (
@@ -88,6 +89,7 @@ def create_db():
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
                  task_id INTEGER,
                  student_id INTEGER,
+                 name_student TEXT,
                  teacher_id INTEGER,
                  name_of_discipline TEXT,
                  the_task_for_student TEXT,
