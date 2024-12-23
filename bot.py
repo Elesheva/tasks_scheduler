@@ -809,7 +809,7 @@ def send_comment(message, teacher_id):
         bot.send_message(teacher_id,
                          "Неверный номер. Попробуйте ещё раз:")
         bot.register_next_step_handler(message,
-                                       lambda msg: statystics(msg, teacher_id))
+                                       lambda msg: send_comment(msg, teacher_id))
         return
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
@@ -832,6 +832,7 @@ def send_comment(message, teacher_id):
                     range(len(info_complete_task)))
                 bot.send_message(message.chat.id, f"РЕШЕНИЕ ОТПРАВИЛИ:\n{output}")
                 bot.send_message(message.chat.id, f"Введите номер решения, по которому хотите отправить оценку:")
+                bot.register_next_step_handler(message, lambda msg: send_mark(msg, teacher_id, nomber, info_complete_task))
             else:
                 bot.send_message(message.chat.id, f"Нет решённых задач от студентов.")
     connection.commit()
@@ -839,6 +840,27 @@ def send_comment(message, teacher_id):
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
 
+def send_mark(message, teacher_id, nomber, info_complete_task):
+    try:
+        id = int(message.text)
+    except ValueError:
+        bot.send_message(teacher_id,
+                         "Неверный номер. Попробуйте ещё раз:")
+        bot.register_next_step_handler(message,
+                                       lambda msg: send_mark(msg, teacher_id, nomber))
+        return
+    have = False
+    for i in range(len(info_complete_task)):
+        if info_complete_task[i][0] == id:
+            have = True
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("2 - неудовлетворительно", callback_data="neyd"))
+            markup.add(types.InlineKeyboardButton("3 - удовлетворительно", callback_data="ydovletvoritelno"))
+            markup.add(types.InlineKeyboardButton("4 - хорошо", callback_data="horosho"))
+            markup.add(types.InlineKeyboardButton("5 - отлично", callback_data="otlichno"))
+            bot.send_message(message.chat.id, f"Введите оценку:", reply_markup=markup)
+    if not have:
+        bot.send_message(teacher_id, "Такого номера нет.")
 
 # Удаляем учётную запись
 @bot.message_handler(commands=['delete_account'])
