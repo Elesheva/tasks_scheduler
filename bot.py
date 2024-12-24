@@ -118,6 +118,7 @@ def registr(callback):
         bot.register_next_step_handler(callback.message,
                                        lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
 
+
 def register_name(message):
     name = message.text
     bot.send_message(message.chat.id,
@@ -831,6 +832,7 @@ def statystics(message, teacher_id):
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
 
+
 def send_comment(message, teacher_id):
     try:
         nomber = int(message.text)
@@ -870,6 +872,7 @@ def send_comment(message, teacher_id):
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
 
+
 def send_mark(message, teacher_id, nomber, info_complete_task):
     try:
         id = int(message.text)
@@ -893,6 +896,7 @@ def send_mark(message, teacher_id, nomber, info_complete_task):
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
 
+
 def ocenka(message, teacher_id, mark, id, nomber):
     comment = message.text
     connection = sqlite3.connect('my_database.db')
@@ -909,10 +913,13 @@ def ocenka(message, teacher_id, mark, id, nomber):
         task_id, student_id, group_number, the_task_for_student, name_of_discipline = task
         cursor.execute(
             'INSERT INTO teacher_comment (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, send_time, date, group_number, comment, mark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, current_time, current_date, group_number, comment, mark))
+            (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, current_time, current_date,
+             group_number, comment, mark))
         connection.commit()
         connection.close()
-        bot.send_message(teacher_id, f"Ваш комментарий:\nОценка {mark}\n{comment}\nБудет отправлен через 1 минуту. Вам придёт уведомление")
+        bot.send_message(teacher_id,
+                         f"Ваш комментарий:\nОценка {mark}\n{comment}\nБудет отправлен через 1 минуту. Вам придёт уведомление")
+
 
 # Удаляем учётную запись
 @bot.message_handler(commands=['delete_account'])
@@ -1320,18 +1327,26 @@ def get_all_tasks_from_db(message):
     cursor = connection.cursor()
     cursor.execute("SELECT task, task_time, date FROM tasks WHERE user_id = ?", (user_id,))
     tasks = cursor.fetchall()
-    print(tasks)
+    cursor.execute(
+        "SELECT task_id, name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ",
+        (user_id,))
+    tasks_from_teacher = cursor.fetchall()
     connection.commit()
     connection.close()
     output = "".join(f"{i + 1}) {tasks[i][0]} в {tasks[i][1]}, {tasks[i][2]}\n" for i in range(len(tasks)))
-    print(output)
+    output_task_from_teacher = "".join(
+        f"Задача №{tasks_from_teacher[i][0]}\n {tasks_from_teacher[i][1]}\nЗадание:{tasks_from_teacher[i][2]}\n" for i
+        in range(len(tasks_from_teacher)))
     if len(output) != 0:
         bot.send_message(message.chat.id,
                          f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
         bot.send_message(message.chat.id, output)
+
+    if len(output_task_from_teacher) != 0:
+        bot.send_message(message.chat.id, output_task_from_teacher)
     else:
         bot.send_message(message.chat.id,
-                         f'{message.from_user.first_name} {message.from_user.last_name}, у вас нет задач:)')
+                         f'{message.from_user.first_name}, у вас нет задач.')
 
 
 # УДАЛЕНИЕ ЗАДАЧИ ИЗ БД
@@ -1351,10 +1366,13 @@ def delete_task_from_db(message):
         cursor.execute("SELECT COUNT (*) FROM task_for_student WHERE teacher_id = ?", (user_id,))
         count = cursor.fetchone()[0]
         if count > 0:
-            cursor.execute("SELECT id, the_task_for_student, name_of_discipline, send_date, send_time, group_number FROM task_for_student WHERE teacher_id = ?", (user_id,))
+            cursor.execute(
+                "SELECT id, the_task_for_student, name_of_discipline, send_date, send_time, group_number FROM task_for_student WHERE teacher_id = ?",
+                (user_id,))
             tasks = cursor.fetchall()
             proverka_id = "".join(f"{x[0]} " for x in tasks)
-            output = "".join(f"№{x[0]} - {x[2]}, ЗАДАЧА: {x[1]}\nДЛЯ ГРУППЫ:{x[5]}\nВРЕМЯ ОТПРАВКИ: {x[3]}, {x[4]}\n" for x in tasks)
+            output = "".join(
+                f"№{x[0]} - {x[2]}, ЗАДАЧА: {x[1]}\nДЛЯ ГРУППЫ:{x[5]}\nВРЕМЯ ОТПРАВКИ: {x[3]}, {x[4]}\n" for x in tasks)
             bot.send_message(message.chat.id,
                              f"{message.from_user.first_name}, все ваши задачи:")
             bot.send_message(message.chat.id, output)
@@ -1438,6 +1456,7 @@ def delete_tasks_from_db(message, proverka_id, statys):
         print(f"Error: {e}")
     finally:
         connection.close()
+
 
 # НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ
 def send_message_ga(user_id, message):
@@ -1590,6 +1609,7 @@ def send_coment_teacher():
                         f"Комментарий отправлен.")
     conn.commit()
     conn.close()
+
 
 scheduler = BackgroundScheduler()
 # Запланируем выполнение функции check_tasks каждую минуту
