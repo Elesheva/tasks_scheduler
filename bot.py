@@ -833,7 +833,6 @@ def statystics(message, teacher_id):
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
 
-
 def send_comment(message, teacher_id):
     try:
         nomber = int(message.text)
@@ -864,7 +863,8 @@ def send_comment(message, teacher_id):
                     range(len(info_complete_task)))
                 bot.send_message(message.chat.id, f"РЕШЕНИЕ ОТПРАВИЛИ:\n{output}")
                 bot.send_message(message.chat.id, f"Введите номер решения, по которому хотите отправить оценку:")
-                bot.register_next_step_handler(message, lambda msg: send_mark(msg, teacher_id, nomber, info_complete_task))
+                bot.register_next_step_handler(message,
+                                               lambda msg: send_mark(msg, teacher_id, nomber, info_complete_task))
             else:
                 bot.send_message(message.chat.id, f"Нет решённых задач от студентов.")
     connection.commit()
@@ -887,7 +887,8 @@ def send_mark(message, teacher_id, nomber, info_complete_task):
             have = True
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("2 - неудовлетворительно", callback_data=f"neyd{id}-{nomber}"))
-            markup.add(types.InlineKeyboardButton("3 - удовлетворительно", callback_data=f"ydovletvoritelno{id}-{nomber}"))
+            markup.add(
+                types.InlineKeyboardButton("3 - удовлетворительно", callback_data=f"ydovletvoritelno{id}-{nomber}"))
             markup.add(types.InlineKeyboardButton("4 - хорошо", callback_data=f"horosho{id}-{nomber}"))
             markup.add(types.InlineKeyboardButton("5 - отлично", callback_data=f"otlichno{id}-{nomber}"))
             bot.send_message(message.chat.id, f"Введите оценку:", reply_markup=markup)
@@ -895,12 +896,24 @@ def send_mark(message, teacher_id, nomber, info_complete_task):
         bot.send_message(teacher_id, "Такого номера нет.")
 
 def ocenka(message, teacher_id, mark, id, nomber):
-    print(teacher_id, mark, id, nomber)
     comment = message.text
-    #ВЫВОДИМ ПОЛНОСТЬЮ ПРЕПОДАВАТЕЛЮ ЕГО КОММЕНТАРИЙ
-    #ВЫВОДИМ КНОПКУ ПОМЕНЯТЬ
-    #ЗАПИСЫВАЕМ в БД
-
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT task_id, student_id, group_number, the_task_for_student, name_of_discipline FROM task_list WHERE teacher_id = ? AND id = ? AND complete = 1",
+        (teacher_id, id))
+    complete = cursor.fetchall()
+    now = datetime.now()
+    new_time = now + timedelta(minutes=1)
+    current_date = now.strftime("%d.%m")
+    current_time = new_time.strftime("%H:%M")
+    task_id, student_id, group_number, the_task_for_student, name_of_discipline = complete
+    cursor.execute(
+        'INSERT INTO teacher_comment (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, send_time, date, group_number, comment, mark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, current_time, current_date, group_number, comment, mark))
+    connection.commit()
+    connection.close()
+    bot.send_message(teacher_id, f"Ваш комментарий:\nОценка {mark}\n{comment}\nБудет отправлен через 1 минуту. Вам придёт уведомление")
 
 # Удаляем учётную запись
 @bot.message_handler(commands=['delete_account'])
@@ -1486,11 +1499,39 @@ def send_doc_for_teacher():
     conn.close()
 
 
+def send_coment_teacher():
+    conn = sqlite3.connect('my_database.db')
+    cursor = conn.cursor()
+    now = datetime.now()
+    current_time = now.strftime("%H:%M")
+    current_date = now.strftime("%d.%m")
+    cursor.execute("""
+            SELECT task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, send_time, date, group_number, comment, mark
+            FROM teacher_comment 
+            WHERE task_time = ? AND date = ? """, (current_time, current_date))
+    comments = cursor.fetchall()
+    for comm in comments:
+        task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, send_time, date, group_number, comment, mark = comm
+        cursor.execute("""
+                SELECT name 
+                FROM teachers 
+                WHERE teacher_id = ? """, (teacher_id,))
+        name_teacher = cursor.fetchall()
+        for name in name_teacher:
+            teacher_name = name[0]
+            send_message_ga(student_id,
+                            f"КОММЕНТАРИЙ ПРЕПОДАВАТЕЛЯ:\n{teacher_name}\nОценка {mark} по №{task_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nКомментарий:{comment} ")
+        send_message_ga(teacher_id,
+                        f"Комментарий отправлен.")
+    conn.commit()
+    conn.close()
+
 scheduler = BackgroundScheduler()
 # Запланируем выполнение функции check_tasks каждую минуту
 scheduler.add_job(check_tasks, 'interval', minutes=1)
 scheduler.add_job(send_doc, 'interval', minutes=1)
 scheduler.add_job(send_doc_for_teacher, 'interval', minutes=1)
+scheduler.add_job(send_coment_teacher, 'interval', minutes=1)
 scheduler.start()
 
 bot.polling(none_stop=True)

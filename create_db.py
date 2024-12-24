@@ -101,6 +101,24 @@ def create_db():
              )
          """)
 
+    cursor.execute("""
+             CREATE TABLE IF NOT EXISTS teacher_comment (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 task_id INTEGER,
+                 student_id INTEGER,
+                 name_teacher TEXT,
+                 teacher_id INTEGER,
+                 name_of_discipline TEXT,
+                 the_task_for_student TEXT,
+                 send_time TEXT,
+                 date TEXT,
+                 group_number TEXT,
+                 comment TEXT,
+                 mark INTEGER
+             )
+         """)
+
+
     # Создание таблицы result (Результат для Преподавателя)
     cursor.execute("""
              CREATE TABLE IF NOT EXISTS result (
