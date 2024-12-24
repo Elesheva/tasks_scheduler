@@ -776,7 +776,7 @@ def complete_task(message):
         markup.add(types.InlineKeyboardButton("Отправить оценку", callback_data="send_mark"))
         bot.send_message(message.chat.id, f"Вы отправили задачи:{output}", reply_markup=markup)
     else:
-        bot.send_message(message.chat.id, f"У вас пока нет отправленных задач.")
+        bot.send_message(message.chat.id, f"У вас нет отправленных задач.")
 
 
 def statystics(message, teacher_id):
@@ -820,8 +820,6 @@ def statystics(message, teacher_id):
                     for i in
                     range(len(info_complete_task)))
                 bot.send_message(message.chat.id, f"РЕШЕНИЕ ОТПРАВИЛИ {count_complete_task} студента(-ов):{output}")
-            else:
-                bot.send_message(message.chat.id, f"Нет решённых задач от студентов.")
             if info_dont_complete_task:
                 out = "".join(
                     f"\n{info_dont_complete_task[i][0]}- {info_dont_complete_task[i][1]}"
@@ -829,7 +827,7 @@ def statystics(message, teacher_id):
                     range(len(info_dont_complete_task)))
                 bot.send_message(message.chat.id, f"НЕ ОТПРАВИЛИ {count_dont_complete_task} студента(-ов): {out}")
             else:
-                bot.send_message(message.chat.id, f"НЕ ОТПРАВИЛИ 0 студента(-ов)")
+                bot.send_message(message.chat.id, f"Нет решённых задач от студентов.")
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
 
@@ -907,13 +905,14 @@ def ocenka(message, teacher_id, mark, id, nomber):
     new_time = now + timedelta(minutes=1)
     current_date = now.strftime("%d.%m")
     current_time = new_time.strftime("%H:%M")
-    task_id, student_id, group_number, the_task_for_student, name_of_discipline = complete
-    cursor.execute(
-        'INSERT INTO teacher_comment (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, send_time, date, group_number, comment, mark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, current_time, current_date, group_number, comment, mark))
-    connection.commit()
-    connection.close()
-    bot.send_message(teacher_id, f"Ваш комментарий:\nОценка {mark}\n{comment}\nБудет отправлен через 1 минуту. Вам придёт уведомление")
+    for task in complete:
+        task_id, student_id, group_number, the_task_for_student, name_of_discipline = task
+        cursor.execute(
+            'INSERT INTO teacher_comment (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, send_time, date, group_number, comment, mark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, current_time, current_date, group_number, comment, mark))
+        connection.commit()
+        connection.close()
+        bot.send_message(teacher_id, f"Ваш комментарий:\nОценка {mark}\n{comment}\nБудет отправлен через 1 минуту. Вам придёт уведомление")
 
 # Удаляем учётную запись
 @bot.message_handler(commands=['delete_account'])
@@ -1114,11 +1113,12 @@ def save_task(message, task_plan, user_id, what_time, regular, statys):
             days, month = map(int, date_time.split('.'))
             print(month, days)
             if 1 <= month <= 12 and 1 <= days < 32:
+                count_regular_task = 0
                 connection = sqlite3.connect('my_database.db')
                 cursor = connection.cursor()
                 cursor.execute(
-                    'INSERT INTO tasks (user_id, task, task_time, date, regular_task) VALUES (?, ?, ?, ?, ?)',
-                    (user_id, task_plan, what_time, date_time, regular))
+                    'INSERT INTO tasks (user_id, task, task_time, date, regular_task, count_regular_task) VALUES (?, ?, ?, ?, ?, ?)',
+                    (user_id, task_plan, what_time, date_time, regular, count_regular_task))
                 connection.commit()
                 connection.close()
                 bot.send_message(message.chat.id, "Задача добавлена!")
@@ -1340,54 +1340,108 @@ def delete_task_from_db(message):
     user_id = message.from_user.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("SELECT COUNT (*) FROM tasks WHERE user_id = ?", (user_id,))
-    count = cursor.fetchone()[0]
-    if count > 0:
-        cursor.execute("SELECT id, task, task_time, date FROM tasks WHERE user_id = ?", (user_id,))
-        tasks = cursor.fetchall()
-        connection.commit()
-        connection.close()
-        print(tasks)
-        proverka_id = "".join(f"{x[0]} " for x in tasks)
-        output = "".join(f"{x[0]} - {x[1]} в {x[2]}, {x[3]}\n" for x in tasks)
-        print(output)
-        bot.send_message(message.chat.id,
-                         f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
-        bot.send_message(message.chat.id, output)
-        bot.send_message(message.chat.id, "Напишите номер задачи, которую хотите удалить.")
-        bot.register_next_step_handler(message, lambda msg: delete_tasks_from_db(msg, proverka_id))
-    else:
-        bot.send_message(message.chat.id, "У вас нет задач")
-
-
-def delete_tasks_from_db(message, proverka_id):
-    id = message.text
-    print(proverka_id)
-    print(type(id))
-    if id in proverka_id:
-        user_id = message.from_user.id
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (user_id,))
+    count_teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (user_id,))
+    count_student = cursor.fetchone()[0]
+    if count_teacher > 0 and count_student > 0:
+        delete_zapis(message)
+    elif count_teacher > 0 and count_student == 0:
+        statys = 1
+        cursor.execute("SELECT COUNT (*) FROM task_for_student WHERE teacher_id = ?", (user_id,))
+        count = cursor.fetchone()[0]
+        if count > 0:
+            cursor.execute("SELECT id, the_task_for_student, name_of_discipline, send_date, send_time, group_number FROM task_for_student WHERE teacher_id = ?", (user_id,))
+            tasks = cursor.fetchall()
+            proverka_id = "".join(f"{x[0]} " for x in tasks)
+            output = "".join(f"№{x[0]} - {x[2]}, ЗАДАЧА: {x[1]}\nДЛЯ ГРУППЫ:{x[5]}\nВРЕМЯ ОТПРАВКИ: {x[3]}, {x[4]}\n" for x in tasks)
+            bot.send_message(message.chat.id,
+                             f"{message.from_user.first_name}, все ваши задачи:")
+            bot.send_message(message.chat.id, output)
+            bot.send_message(message.chat.id, "Напишите номер задачи, которую хотите удалить.")
+            bot.register_next_step_handler(message, lambda msg: delete_tasks_from_db(msg, proverka_id, statys))
+        else:
+            bot.send_message(message.chat.id, "У вас нет задач")
+    elif count_teacher == 0 and count_student > 0:
+        statys = 2
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
-        cursor.execute("DELETE FROM tasks WHERE id = ?", (id,))
         cursor.execute("SELECT COUNT (*) FROM tasks WHERE user_id = ?", (user_id,))
         count = cursor.fetchone()[0]
         if count > 0:
-            connection.commit()
-            connection.close()
-            bot.send_message(message.chat.id, f"Задача {id} удалена")
-            get_all_tasks_from_db(message)
+            cursor.execute("SELECT id, task, task_time, date FROM tasks WHERE user_id = ?", (user_id,))
+            tasks = cursor.fetchall()
+            proverka_id = "".join(f"{x[0]} " for x in tasks)
+            output = "".join(f"{x[0]} - {x[1]} в {x[2]}, {x[3]}\n" for x in tasks)
+            bot.send_message(message.chat.id,
+                             f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
+            bot.send_message(message.chat.id, output)
+            bot.send_message(message.chat.id, "Напишите номер задачи, которую хотите удалить.")
+            bot.register_next_step_handler(message, lambda msg: delete_tasks_from_db(msg, proverka_id, statys))
         else:
-            connection.commit()
-            connection.close()
-            bot.send_message(message.chat.id, f"Задача {id} удалена")
-            bot.send_message(message.chat.id, "Список задач пуст.")
+            bot.send_message(message.chat.id, "У вас нет задач")
     else:
-        bot.send_message(message.chat.id, "Такого номера нет.")
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "У вас нет учётной записи. Для того, чтобы создать задачу необходимо зарегистрироваться.",
+                         reply_markup=markup)
+    connection.commit()
+    connection.close()
 
+
+def delete_tasks_from_db(message, proverka_id, statys):
+    id = message.text
+    user_id = message.from_user.id
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    try:
+        if statys == 1:
+            if id in proverka_id:
+                id = int(id)
+                cursor.execute(
+                    "SELECT student_id, task_id, name_of_discipline, the_task_for_student FROM task_list WHERE task_id = ?",
+                    (id,))
+                tasks = cursor.fetchall()
+                cursor.execute("DELETE FROM task_for_student WHERE id = ?", (id,))
+                cursor.execute("DELETE FROM task_list WHERE task_id = ?", (id,))
+                for task in tasks:
+                    student_id, task_id, name_of_discipline, the_task_for_student = task
+                    bot.send_message(student_id,
+                                     f"Задача №{task_id}, {name_of_discipline}\nЗадание:{the_task_for_student}\nУДАЛЕНО ПРЕПОДАВАТЕЛЕМ")
+                cursor.execute("SELECT COUNT(*) FROM task_for_student WHERE teacher_id = ?", (user_id,))
+                count = cursor.fetchone()[0]
+                if count > 0:
+                    bot.send_message(message.chat.id, f"Задача {id} удалена")
+                else:
+                    bot.send_message(message.chat.id, f"Задача {id} удалена")
+                    bot.send_message(message.chat.id, "Список задач пуст.")
+            else:
+                bot.send_message(message.chat.id, "Такого номера нет.")
+        elif statys == 2:
+            if id in proverka_id:
+                id = int(id)
+                cursor.execute("DELETE FROM tasks WHERE id = ?", (id,))
+                cursor.execute("SELECT COUNT(*) FROM tasks WHERE user_id = ?", (user_id,))
+                count = cursor.fetchone()[0]
+                if count > 0:
+                    bot.send_message(message.chat.id, f"Задача {id} удалена")
+                    get_all_tasks_from_db(message)
+                else:
+                    bot.send_message(message.chat.id, f"Задача {id} удалена")
+                    bot.send_message(message.chat.id, "Список задач пуст.")
+            else:
+                bot.send_message(message.chat.id, "Такого номера нет.")
+        connection.commit()
+    except Exception as e:
+        bot.send_message(message.chat.id, "Произошла ошибка при удалении задачи.")
+        print(f"Error: {e}")
+    finally:
+        connection.close()
 
 # НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ
 def send_message_ga(user_id, message):
-    bot.send_message(chat_id=user_id, text=message)
+    bot.send_message(chat_id=user_id, text=f"НАПОМИНАНИЕ: {message}")
 
 
 # ОТПРАВЛЕНИЕ ПЕРСОНАЛЬНОЙ ЗАДАЧИ СТУДЕНТА
@@ -1407,7 +1461,18 @@ def check_tasks():
     for task in tasks:
         task_id, user_id, message, regular_task = task
         send_message_ga(user_id, message)
-
+        if regular_task == 1:
+            next_day = now + timedelta(days=1)
+            current_datee = next_day.strftime("%d.%m")
+            cursor.execute("""
+                            UPDATE tasks 
+                            SET date = ?
+                            WHERE id = ?
+                        """, (current_datee, task_id))
+            cursor.execute("""UPDATE tasks 
+                            SET count_regular_task = count_regular_task + 1
+                            WHERE id = ?
+                        """, (task_id,))
         # Если задача не регулярная, обновляем complete на True
         if not regular_task:
             cursor.execute("""
@@ -1508,7 +1573,7 @@ def send_coment_teacher():
     cursor.execute("""
             SELECT task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, send_time, date, group_number, comment, mark
             FROM teacher_comment 
-            WHERE task_time = ? AND date = ? """, (current_time, current_date))
+            WHERE send_time = ? AND date = ? """, (current_time, current_date))
     comments = cursor.fetchall()
     for comm in comments:
         task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, send_time, date, group_number, comment, mark = comm
