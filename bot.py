@@ -125,7 +125,6 @@ def register_name(message):
                      f"{name}, вы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
     bot.register_next_step_handler(message, lambda msg: register_student(msg, name, message.chat.id))
 
-
 # РЕГИСТРАЦИЯ СТУДЕНТОВ
 def register_student(message, name, student_id):
     if message.text == "1":
@@ -138,9 +137,8 @@ def register_student(message, name, student_id):
             bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
             changing_student(message, student_id)
         else:
-            bot.send_message(message.chat.id,
-                             f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
-            bot.register_next_step_handler(message, lambda msg: student_nomber(msg, name, student_id))
+            bot.send_message(student_id, "Введите пароль: ")
+            bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id))
     elif message.text == "2":
         print(2)
         connection = sqlite3.connect('my_database.db')
@@ -151,14 +149,34 @@ def register_student(message, name, student_id):
             bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
             changing_teacher(message, student_id)
         else:
-            bot.send_message(message.chat.id,
-                             f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
-            bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name, message.chat.id))
+            bot.send_message(student_id, "Введите пароль: ")
+            bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id))
     else:
         bot.send_message(message.chat.id,
                          f"{name}, вы ввели неверное значение, попробуйте ещё раз.\nВы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
         bot.register_next_step_handler(message, lambda msg: register_student(msg, name, student_id))
 
+
+def proverka_parol(message, name, student_id):
+    parol = message.text
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT (*) FROM parol WHERE parol_for_student = ?",
+                   (parol,))
+    student_parol = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM parol WHERE parol_for_teacher = ?",
+                   (parol,))
+    teacher_parol = cursor.fetchone()[0]
+    if student_parol > 0 and teacher_parol == 0:
+        bot.send_message(message.chat.id,
+                         f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
+        bot.register_next_step_handler(message, lambda msg: student_nomber(msg, name, student_id))
+    if student_parol == 0 and teacher_parol > 0:
+        bot.send_message(message.chat.id,
+                         f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
+        bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name, message.chat.id))
+    else:
+        bot.send_message(message.chat.id, "Вы ввели неправильный пароль.")
 
 def student_nomber(message, name, student_id):
     phone_nomber = message.text

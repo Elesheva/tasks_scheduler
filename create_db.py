@@ -134,6 +134,15 @@ def create_db():
         )
     """)
 
+    # Создание таблицы task_for_student
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS parol (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parol_for_teacher TEXT,
+            parol_for_student TEXT,
+            id_admin INTEGER
+        )
+    """)
     connection.commit()
     cursor.close()
     connection.close()
