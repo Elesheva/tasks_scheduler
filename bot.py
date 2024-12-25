@@ -118,6 +118,16 @@ def registr(callback):
         bot.register_next_step_handler(callback.message,
                                        lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
 
+    if callback.data == "change_parol_teacher":
+        bot.send_message(callback.message.chat.id,
+                         "Пожалуйста, введите новый пароль:")
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: change_parol_teacher(msg, callback.message.chat.id))
+    if callback.data == "change_parol_student":
+        bot.send_message(callback.message.chat.id,
+                         "Пожалуйста, введите новый пароль:")
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: change_parol_student(msg, callback.message.chat.id))
 
 def register_name(message):
     name = message.text
@@ -426,6 +436,7 @@ def nomber_change(message):
         bot.send_message(message.chat.id,
                          "Такого номера нет, попробуйте ещё раз. Введите номер поля, которое хотите изменить:")
         bot.register_next_step_handler(message, nomber_change)
+
 
 
 def changing_db_student(message, student_id, nomber, info_about_faculty):
@@ -1474,6 +1485,50 @@ def delete_tasks_from_db(message, proverka_id, statys):
         print(f"Error: {e}")
     finally:
         connection.close()
+
+#МЕНЯЕМ ПАРОЛЬ (АДМИНИСТРАТОР)
+@bot.message_handler(commands=['change_parol'])
+def change_parol(message):
+    user_id = message.chat.id
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT(*) FROM parol WHERE id_admin = ?", (user_id,))
+    count = cursor.fetchone()[0]
+    #При смене администратора удалить строчки: "if count >0:" ; "else: bot.send_message(user_id, "Пароль изменяет только администратор.")"
+    if count >0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Преподаватели", callback_data="change_parol_teacher"))
+        markup.add(types.InlineKeyboardButton("Студенты", callback_data="change_parol_student"))
+        bot.send_message(user_id, "Для кого хотите поменять пароль? ", reply_markup=markup)
+    else:
+        bot.send_message(user_id, "Пароль изменяет только администратор.")
+
+def change_parol_teacher (message, user_id):
+    new_parol = message.text
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    #ПРИ СМЕНЕ АДМИНА ДОБАВИТЬ СТРОЧКИ:
+    #cursor.execute('INSERT INTO parol (id_admin) VALUES (?)',
+    #               (user_id,))
+    cursor.execute("""UPDATE parol 
+                            SET parol_for_teacher = ?
+                            WHERE id_admin = ?
+                        """, (new_parol, user_id))
+    bot.send_message(user_id, "Новый пароль для преподавателей установлен.")
+    connection.commit()
+    connection.close()
+
+def change_parol_student(message, user_id):
+    new_parol = message.text
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("""UPDATE parol 
+                            SET parol_for_student = ?
+                            WHERE id_admin = ?
+                        """, (new_parol, user_id))
+    bot.send_message(user_id, "Новый пароль для студентов установлен.")
+    connection.commit()
+    connection.close()
 
 
 # НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ

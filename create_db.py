@@ -134,7 +134,7 @@ def create_db():
         )
     """)
 
-    # Создание таблицы task_for_student
+    # Создание таблицы parol
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS parol (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
