@@ -57,9 +57,9 @@ def create_db():
     cursor.execute("""
          CREATE TABLE IF NOT EXISTS statystic_for_teacher (
              id INTEGER PRIMARY KEY AUTOINCREMENT,
+             send_date TEXT,
              student_id INTEGER,
              name_student TEXT,
-             task_id INTEGER,
              all_marks TEXT,
              average_rating TEXT,
              teacher_id INTEGER,

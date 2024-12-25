@@ -75,10 +75,23 @@ def registr(callback):
                                        lambda msg: send_task_for_teacher(msg, callback.message.chat.id))
 
     if callback.data == "statystic":
-        bot.send_message(callback.message.chat.id,
-                         "Пожалуйста, введите номер задания, по которому хотите увидеть статистику:")
-        bot.register_next_step_handler(callback.message,
-                                       lambda msg: statystics(msg, callback.message.chat.id))
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute(
+            "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1 ",
+            (callback.message.chat.id,))
+        info_send_task = cursor.fetchall()
+        connection.commit()
+        connection.close()
+        if info_send_task:
+            output = "".join(
+                f"\n{info_send_task[i][0]}) {info_send_task[i][2]} {info_send_task[i][1]}\nЗадача:\n{info_send_task[i][3]}\nотправлено в {info_send_task[i][4]} {info_send_task[i][5]}"
+                for i in
+                range(len(info_send_task)))
+            bot.send_message(callback.message.chat.id,
+                             f"{output}\nПожалуйста, введите номер задания, по которому хотите увидеть статистику:")
+            bot.register_next_step_handler(callback.message,
+                                           lambda msg: statystics(msg, callback.message.chat.id))
     if callback.data == "send_mark":
         bot.send_message(callback.message.chat.id,
                          "Пожалуйста, введите номер задания, по которому хотите отправить оценку:")
@@ -143,11 +156,30 @@ def registr(callback):
         connection.commit()
         connection.close()
 
-    elif callback.data == "dont_done":
+    if callback.data == "dont_done":
         # Обновляем сообщение, убирая кнопки
         bot.edit_message_text(chat_id=callback.message.chat.id,
                               message_id=callback.message.message_id,
                               text="Ваш ответ принят.")
+
+    if callback.data == "all_statystic":
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute(
+            "SELECT name_of_discipline FROM discipline WHERE teacher_id = ?",
+            (callback.message.chat.id,))
+        discipline = cursor.fetchall()
+        connection.commit()
+        connection.close()
+        if discipline:
+            output = "".join(
+                f"\n{i+1}) {discipline[i][0]} "
+                for i in
+                range(len(discipline)))
+            bot.send_message(callback.message.chat.id,
+                             f"Пожалуйста, выберите дисциплину:\n{output}")
+            bot.register_next_step_handler(callback.message,
+                                           lambda msg: all_statystic(msg, callback.message.chat.id, discipline))
 
 
 def register_name(message):
@@ -813,32 +845,32 @@ def changing_grouppp(message, nomber, nomber_group):
         bot.send_message(message.chat.id, "Вы ввели неверное значение. Укажите курс:")
         bot.register_next_step_handler(message, lambda msg: changing_grouppp(msg, nomber, nomber_group))
 
+#Статистика для препода
+@bot.message_handler(commands=['send_statistics'])
+def statis_teacher (message):
+    teacher_id = message.chat.id
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Статистика по отправленной задаче", callback_data="statystic"))
+    markup.add(types.InlineKeyboardButton("Общая статистика, средний балл", callback_data="all_statystic"))
+    bot.send_message(teacher_id, f"Вас интересуют:", reply_markup=markup)
+
+#СРЕДНИЙ БАЛЛ СТАТИСТИКА
+def all_statystic(message, teacher_id, discipline):
+    try:
+        discipline_number = int(message.text)
+    except ValueError:
+        print("Ошибка: Введите корректный номер дисциплины.")
+        return
+
+    if discipline_number < 1 or discipline_number > len(discipline):
+        print("Ошибка: Номер дисциплины вне диапазона.")
+        return
+    selected_discipline = discipline[discipline_number - 1][0]
+    bot.send_message(teacher_id, "Введите номер группы:")
+
+
 
 # ВЫВОДИМ СПИСОК СТУДЕНТОВ СДАВШИХ И НЕ СДАВШИХ РАБОТУ
-@bot.message_handler(commands=['complete_task'])
-def complete_task(message):
-    teacher_id = message.chat.id
-    connection = sqlite3.connect('my_database.db')
-    cursor = connection.cursor()
-    cursor.execute(
-        "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1 ",
-        (teacher_id,))
-    info_send_task = cursor.fetchall()
-    connection.commit()
-    connection.close()
-    if info_send_task:
-        output = "".join(
-            f"\n{info_send_task[i][0]}) {info_send_task[i][2]} {info_send_task[i][1]}\nЗадача:\n{info_send_task[i][3]}\nотправлено в {info_send_task[i][4]} {info_send_task[i][5]}"
-            for i in
-            range(len(info_send_task)))
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Статистика", callback_data="statystic"))
-        markup.add(types.InlineKeyboardButton("Отправить оценку", callback_data="send_mark"))
-        bot.send_message(message.chat.id, f"Вы отправили задачи:{output}", reply_markup=markup)
-    else:
-        bot.send_message(message.chat.id, f"У вас нет отправленных задач.")
-
-
 def statystics(message, teacher_id):
     try:
         nomber = int(message.text)
@@ -891,6 +923,28 @@ def statystics(message, teacher_id):
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
 
+
+@bot.message_handler(commands=['send_mark'])
+def complete_task(message):
+    teacher_id = message.chat.id
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1 ",
+        (teacher_id,))
+    info_send_task = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    if info_send_task:
+        output = "".join(
+            f"\n{info_send_task[i][0]}) {info_send_task[i][2]} {info_send_task[i][1]}\nЗадача:\n{info_send_task[i][3]}\nотправлено в {info_send_task[i][4]} {info_send_task[i][5]}"
+            for i in
+            range(len(info_send_task)))
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Отправить оценку", callback_data="send_mark"))
+        bot.send_message(message.chat.id, f"Вы отправили задачи:{output}", reply_markup=markup)
+    else:
+        bot.send_message(message.chat.id, f"У вас нет отправленных задач.")
 
 def send_comment(message, teacher_id):
     try:
@@ -1653,6 +1707,7 @@ def send_doc():
                     SELECT student_id 
                     FROM student 
                     WHERE group_number = ? """, (group_number,))
+
             for_student = cursor.fetchall()
             for student in for_student:
                 student_id = student[0]
@@ -1693,6 +1748,7 @@ def send_doc_for_teacher():
                     SELECT name 
                     FROM student 
                     WHERE student_id = ? """, (student_id,))
+
             name_student = cursor.fetchall()
             for name in name_student:
                 student_name = name[0]
@@ -1726,6 +1782,9 @@ def send_coment_teacher():
                 FROM teachers 
                 WHERE teacher_id = ? """, (teacher_id,))
         name_teacher = cursor.fetchall()
+        cursor.execute(
+            'INSERT INTO statystic_for_teacher (send_date, student_id, teacher_id, name_of_discipline, group_number) VALUES (?, ?, ?, ?, ?)',
+            (current_date, student_id, teacher_id, name_of_discipline, group_number))
         for name in name_teacher:
             teacher_name = name[0]
             send_message_ga(student_id,
