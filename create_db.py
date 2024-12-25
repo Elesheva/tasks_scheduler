@@ -53,22 +53,35 @@ def create_db():
          )
      """)
 
-    # Создание таблицы result (Результат для Преподавателя)
+    # Создание таблицы statystic_for_teacher (Результат для Преподавателя)
     cursor.execute("""
-         CREATE TABLE IF NOT EXISTS result (
+         CREATE TABLE IF NOT EXISTS statystic_for_teacher (
              id INTEGER PRIMARY KEY AUTOINCREMENT,
              student_id INTEGER,
+             name_student TEXT,
+             task_id INTEGER,
+             all_marks TEXT,
+             average_rating TEXT,
              teacher_id INTEGER,
              name_of_discipline TEXT,
-             the_task_for_student TEXT,
              document BLOB,
-             task_time TEXT,
-             date TEXT,
              group_number TEXT,
-             complete BOOLEAN
+             complete INTEGER,
+             all_tasks INTEGER
          )
      """)
 
+    # Создание таблицы statystic_for_student (Результат по персональным задачам для студента)
+    cursor.execute("""
+         CREATE TABLE IF NOT EXISTS statystic_for_student (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             student_id INTEGER,
+             document BLOB,
+             complete INTEGER,
+             dont_complete INTEGER,
+             all_tasks INTEGER
+         )
+     """)
     # Создание таблицы teachers
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS teachers (

@@ -129,6 +129,27 @@ def registr(callback):
         bot.register_next_step_handler(callback.message,
                                        lambda msg: change_parol_student(msg, callback.message.chat.id))
 
+    if callback.data == "done":
+        # Обновляем сообщение, убирая кнопки
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш ответ принят.")
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute("""                
+                        UPDATE statystic_for_student 
+                        SET complete = complete + 1, dont_complete = dont_complete - 1
+                        WHERE student_id = ?""", (callback.message.chat.id,))
+        connection.commit()
+        connection.close()
+
+    elif callback.data == "dont_done":
+        # Обновляем сообщение, убирая кнопки
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш ответ принят.")
+
+
 def register_name(message):
     name = message.text
     bot.send_message(message.chat.id,
@@ -138,6 +159,7 @@ def register_name(message):
 # РЕГИСТРАЦИЯ СТУДЕНТОВ
 def register_student(message, name, student_id):
     if message.text == "1":
+        status = 1
         # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
@@ -148,9 +170,10 @@ def register_student(message, name, student_id):
             changing_student(message, student_id)
         else:
             bot.send_message(student_id, "Введите пароль: ")
-            bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id))
+            bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id, status))
     elif message.text == "2":
         print(2)
+        status = 2
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
         cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (student_id,))
@@ -160,33 +183,40 @@ def register_student(message, name, student_id):
             changing_teacher(message, student_id)
         else:
             bot.send_message(student_id, "Введите пароль: ")
-            bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id))
+            bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id, status))
     else:
         bot.send_message(message.chat.id,
                          f"{name}, вы ввели неверное значение, попробуйте ещё раз.\nВы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
         bot.register_next_step_handler(message, lambda msg: register_student(msg, name, student_id))
 
 
-def proverka_parol(message, name, student_id):
+def proverka_parol(message, name, student_id, status):
     parol = message.text
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("SELECT COUNT (*) FROM parol WHERE parol_for_student = ?",
-                   (parol,))
-    student_parol = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT (*) FROM parol WHERE parol_for_teacher = ?",
-                   (parol,))
-    teacher_parol = cursor.fetchone()[0]
-    if student_parol > 0 and teacher_parol == 0:
-        bot.send_message(message.chat.id,
-                         f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
-        bot.register_next_step_handler(message, lambda msg: student_nomber(msg, name, student_id))
-    if student_parol == 0 and teacher_parol > 0:
-        bot.send_message(message.chat.id,
-                         f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
-        bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name, message.chat.id))
-    else:
-        bot.send_message(message.chat.id, "Вы ввели неправильный пароль.")
+    if status == 1:
+        cursor.execute("SELECT COUNT (*) FROM parol WHERE parol_for_student = ?",
+                       (parol,))
+        student_parol = cursor.fetchone()[0]
+        if student_parol > 0:
+            bot.send_message(message.chat.id,
+                             f"{name}, вы являетесь студентом МУИВ, пожалуйста введите ваш номер телефона.\nЭти данные будут доступны только вашему преподавателю")
+            bot.register_next_step_handler(message, lambda msg: student_nomber(msg, name, student_id))
+        else:
+            bot.send_message(message.chat.id, "Вы ввели неправильный пароль. Попробуйте ещё раз:")
+            bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id, status))
+
+    if status == 2:
+        cursor.execute("SELECT COUNT (*) FROM parol WHERE parol_for_teacher = ?",
+                       (parol,))
+        teacher_parol = cursor.fetchone()[0]
+        if teacher_parol > 0:
+            bot.send_message(message.chat.id,
+                             f"{name}, вы являетесь преподавателем МУИВ, пожалуйста введите ваш номер телефона:")
+            bot.register_next_step_handler(message, lambda msg: register_teacher(msg, name, message.chat.id))
+        else:
+            bot.send_message(message.chat.id, "Вы ввели неправильный пароль. Попробуйте ещё раз:")
+            bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id, status))
 
 def student_nomber(message, name, student_id):
     phone_nomber = message.text
@@ -1155,6 +1185,11 @@ def save_task(message, task_plan, user_id, what_time, regular, statys):
                 cursor.execute(
                     'INSERT INTO tasks (user_id, task, task_time, date, regular_task, count_regular_task) VALUES (?, ?, ?, ?, ?, ?)',
                     (user_id, task_plan, what_time, date_time, regular, count_regular_task))
+                cursor.execute("SELECT COUNT (*) FROM statystic_for_student WHERE student_id = ?", (user_id,))
+                count_statystic_for_student = cursor.fetchone()[0]
+                if count_statystic_for_student == 0:
+                    cursor.execute('INSERT INTO statystic_for_student (student_id) VALUES (?)',
+                        (user_id,))
                 connection.commit()
                 connection.close()
                 bot.send_message(message.chat.id, "Задача добавлена!")
@@ -1531,9 +1566,16 @@ def change_parol_student(message, user_id):
     connection.close()
 
 
-# НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ
+# НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ (Преподаватель)
 def send_message_ga(user_id, message):
     bot.send_message(chat_id=user_id, text=f"НАПОМИНАНИЕ: {message}")
+
+# НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ (Студент)
+def send_message_ga_student(user_id, message):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Выполнено", callback_data="done"))
+    markup.add(types.InlineKeyboardButton("Не выполнено", callback_data="dont_done"))
+    bot.send_message(chat_id=user_id, text=f"НАПОМИНАНИЕ: {message}", reply_markup=markup)
 
 
 # ОТПРАВЛЕНИЕ ПЕРСОНАЛЬНОЙ ЗАДАЧИ СТУДЕНТА
@@ -1552,7 +1594,7 @@ def check_tasks():
     tasks = cursor.fetchall()
     for task in tasks:
         task_id, user_id, message, regular_task = task
-        send_message_ga(user_id, message)
+        send_message_ga_student(user_id, message)
         if regular_task == 1:
             next_day = now + timedelta(days=1)
             current_datee = next_day.strftime("%d.%m")
@@ -1565,6 +1607,11 @@ def check_tasks():
                             SET count_regular_task = count_regular_task + 1
                             WHERE id = ?
                         """, (task_id,))
+            cursor.execute("""                
+                            UPDATE statystic_for_student 
+                            SET all_tasks = all_tasks + 1, 
+                                dont_complete = dont_complete + 1
+                            WHERE student_id = ?""", (user_id,))
         # Если задача не регулярная, обновляем complete на True
         if not regular_task:
             cursor.execute("""
@@ -1572,6 +1619,11 @@ def check_tasks():
                 SET complete = 1 
                 WHERE id = ?
             """, (task_id,))
+            cursor.execute("""                
+                UPDATE statystic_for_student 
+                SET all_tasks = all_tasks + 1, 
+                    dont_complete = dont_complete + 1
+                WHERE student_id = ?""", (user_id,))
 
     conn.commit()
     conn.close()
