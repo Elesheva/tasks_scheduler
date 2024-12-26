@@ -4,6 +4,7 @@ def create_db():
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
 
+    # Создание таблицы teacher_comment (преподаватель)
     cursor.execute("""
              CREATE TABLE IF NOT EXISTS teacher_comment (
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,6 +36,7 @@ def create_db():
             complete BOOLEAN
         )
     """)
+    cursor.execute("DROP TABLE task_list")
     # Создание таблицы task_list (УЧЕБНАЯ ДЛЯ СТУДЕНТА)
     cursor.execute("""
          CREATE TABLE IF NOT EXISTS task_list (
@@ -48,26 +50,10 @@ def create_db():
              document BLOB,
              task_time TEXT,
              date TEXT,
+             send_teacher_for_student_date TEXT, 
+             send_mark_date TEXT,
              group_number TEXT,
              complete BOOLEAN
-         )
-     """)
-
-    # Создание таблицы statystic_for_teacher (Результат для Преподавателя)
-    cursor.execute("""
-         CREATE TABLE IF NOT EXISTS statystic_for_teacher (
-             id INTEGER PRIMARY KEY AUTOINCREMENT,
-             send_date TEXT,
-             student_id INTEGER,
-             name_student TEXT,
-             all_marks TEXT,
-             average_rating TEXT,
-             teacher_id INTEGER,
-             name_of_discipline TEXT,
-             document BLOB,
-             group_number TEXT,
-             complete INTEGER,
-             all_tasks INTEGER
          )
      """)
 

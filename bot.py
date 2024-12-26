@@ -1,6 +1,7 @@
 import os
 from os.path import lexists
-
+from tokenize import group
+from docx import Document
 import telebot
 from pyexpat.errors import messages
 from telebot import types
@@ -99,6 +100,9 @@ def registr(callback):
                                        lambda msg: send_comment(msg, callback.message.chat.id))
 
     if callback.data.startswith("neyd"):
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Записано")
         perems_str = callback.data[4:]
         perems = perems_str.split('-')
         mark = 2
@@ -107,6 +111,9 @@ def registr(callback):
         bot.register_next_step_handler(callback.message,
                                        lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
     if callback.data.startswith("ydovletvoritelno"):
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Записано")
         perems_str = callback.data[16:]
         perems = perems_str.split('-')
         mark = 3
@@ -115,6 +122,9 @@ def registr(callback):
         bot.register_next_step_handler(callback.message,
                                        lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
     if callback.data.startswith("horosho"):
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Записано")
         perems_str = callback.data[7:]
         perems = perems_str.split('-')
         mark = 4
@@ -123,6 +133,9 @@ def registr(callback):
         bot.register_next_step_handler(callback.message,
                                        lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
     if callback.data.startswith("otlichno"):
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Записано")
         perems_str = callback.data[8:]
         perems = perems_str.split('-')
         mark = 5
@@ -861,14 +874,126 @@ def all_statystic(message, teacher_id, discipline):
     except ValueError:
         print("Ошибка: Введите корректный номер дисциплины.")
         return
-
     if discipline_number < 1 or discipline_number > len(discipline):
         print("Ошибка: Номер дисциплины вне диапазона.")
         return
     selected_discipline = discipline[discipline_number - 1][0]
-    bot.send_message(teacher_id, "Введите номер группы:")
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT group_number FROM task_for_student WHERE teacher_id = ? AND name_of_discipline = ?",
+        (teacher_id, selected_discipline ))
+    group_number = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    if group_number:
+        output = "".join(
+            f"\n{i + 1}) {group_number[i][0]} "
+            for i in
+            range(len(group_number)))
+        bot.send_message(teacher_id, f"Введите номер группы:\n{output}")
+        bot.register_next_step_handler(message, lambda msg: all_statistic_g(msg, teacher_id, selected_discipline, group_number))
+    else:
+        bot.send_message(teacher_id, "Вы ещё не отправляли задания для этой группы.")
 
+def all_statistic_g(message, teacher_id, selected_discipline, group_number):
+    try:
+        group = int(message.text)
+    except ValueError:
+        print("Ошибка: Введите корректный номер группы.")
+        return
+    if group < 1 or group > len(group_number):
+        print("Ошибка: Номер группы вне диапазона.")
+        return
+    selected_group = group_number[group - 1][0]
+    bot.send_message(teacher_id, f"Теперь необходимо задать временной диапазоню\nВведите с какого числа и по какое вывести статистику.\n Пример: 10.10.2024-20.12.2024")
+    bot.register_next_step_handler(message,
+                                   lambda msg: all_statistic_date(msg, teacher_id, selected_discipline, selected_group))
 
+def all_statistic_date(message, teacher_id, selected_discipline, selected_group):
+    date = message.text.strip()
+    try:
+        date1_str, date2_str = date.split('-')
+        date1_str = date1_str.strip()
+        date2_str = date2_str.strip()
+
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            SELECT student_id, name_student, task_id, complete 
+            FROM task_list 
+            WHERE teacher_id = ? 
+              AND name_of_discipline = ? 
+              AND group_number = ? 
+              AND send_teacher_for_student_date >= ? 
+              AND send_mark_date <= ?
+            """,
+            (teacher_id, selected_discipline, selected_group, date1_str, date2_str))
+        all_results = cursor.fetchall()
+
+        student_stats = {}
+        for record in all_results:
+            student_id, name_student, task_id, complete = record
+            if name_student not in student_stats:
+                student_stats[name_student] = {
+                    'completed_tasks': [],
+                    'incompleted_tasks': [],
+                    'marks': []
+                }
+            if complete:
+                # Получаем оценку для выполненной задачи
+                cursor.execute(
+                    """
+                    SELECT mark 
+                    FROM teacher_comment 
+                    WHERE teacher_id = ? 
+                      AND name_of_discipline = ? 
+                      AND group_number = ? 
+                      AND task_id = ? 
+                      AND student_id = ?
+                    """,
+                    (teacher_id, selected_discipline, selected_group, task_id, student_id)
+                )
+                mark_result = cursor.fetchone()
+                mark = mark_result[0] if mark_result else None
+
+                if mark is not None:
+                    student_stats[name_student]['completed_tasks'].append((task_id, mark))
+                    student_stats[name_student]['marks'].append(mark)
+            else:
+                student_stats[name_student]['incompleted_tasks'].append(task_id)
+        # Создаем новый документ
+        doc = Document()
+        # Добавляем заголовок
+        doc.add_heading(f'{selected_discipline}\nГруппа {selected_group}\n{date1_str} - {date2_str}', level=1)
+        # Создаем таблицу
+        table = doc.add_table(rows=1, cols=4)
+        table.style = 'Table Grid'
+        # Заголовки таблицы
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'Имя студента'
+        hdr_cells[1].text = 'Выполненные задачи с оценками'
+        hdr_cells[2].text = 'Невыполненные задачи'
+        hdr_cells[3].text = 'Средний балл'
+        # Заполнение таблицы данными
+        for name_student, stats in student_stats.items():
+            completed_tasks_str = ', '.join([f'Задача {task_id}: {mark}' for task_id, mark in stats['completed_tasks']])
+            incompleted_tasks_str = ', '.join(stats['incompleted_tasks'])
+            average_mark = sum(stats['marks']) / len(stats['marks']) if stats['marks'] else 0
+
+            row_cells = table.add_row().cells
+            row_cells[0].text = name_student
+            row_cells[1].text = completed_tasks_str
+            row_cells[2].text = incompleted_tasks_str
+            row_cells[3].text = f'{average_mark:.2f}'
+
+        # Сохранение документа
+        doc.save(f'statistics_{selected_group}_{selected_discipline}.docx')
+    except sqlite3.Error as e:
+        print(f"Ошибка при работе с базой данных: {e}")
+    except ValueError:
+        print("Ошибка: Неверный формат даты. Пожалуйста, убедитесь, что даты введены корректно.")
 
 # ВЫВОДИМ СПИСОК СТУДЕНТОВ СДАВШИХ И НЕ СДАВШИХ РАБОТУ
 def statystics(message, teacher_id):
@@ -930,7 +1055,7 @@ def complete_task(message):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     cursor.execute(
-        "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1 ",
+        "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1",
         (teacher_id,))
     info_send_task = cursor.fetchall()
     connection.commit()
@@ -966,7 +1091,7 @@ def send_comment(message, teacher_id):
         if info_send_task[i][0] == nomber:
             have = True
             cursor.execute(
-                "SELECT id, name_student, group_number, task_time, date, the_task_for_student, name_of_discipline FROM task_list WHERE teacher_id = ? AND task_id = ? AND complete = 1 ",
+                "SELECT id, name_student, group_number, task_time, date, the_task_for_student, name_of_discipline FROM task_list WHERE teacher_id = ? AND task_id = ? AND complete = 1 AND send_mark_date IS NULL",
                 (teacher_id, nomber))
             info_complete_task = cursor.fetchall()
             if info_complete_task:
@@ -1619,10 +1744,9 @@ def change_parol_student(message, user_id):
     connection.commit()
     connection.close()
 
-
 # НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ (Преподаватель)
 def send_message_ga(user_id, message):
-    bot.send_message(chat_id=user_id, text=f"НАПОМИНАНИЕ: {message}")
+    bot.send_message(chat_id=user_id, text=f"{message}")
 
 # НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ (Студент)
 def send_message_ga_student(user_id, message):
@@ -1630,7 +1754,6 @@ def send_message_ga_student(user_id, message):
     markup.add(types.InlineKeyboardButton("Выполнено", callback_data="done"))
     markup.add(types.InlineKeyboardButton("Не выполнено", callback_data="dont_done"))
     bot.send_message(chat_id=user_id, text=f"НАПОМИНАНИЕ: {message}", reply_markup=markup)
-
 
 # ОТПРАВЛЕНИЕ ПЕРСОНАЛЬНОЙ ЗАДАЧИ СТУДЕНТА
 def check_tasks():
@@ -1707,15 +1830,14 @@ def send_doc():
                     SELECT student_id 
                     FROM student 
                     WHERE group_number = ? """, (group_number,))
-
             for_student = cursor.fetchall()
             for student in for_student:
                 student_id = student[0]
                 send_message_ga(student_id, f"{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\n")
                 bot.send_document(student_id, open(f"{document}", "rb"))
                 cursor.execute(
-                    'INSERT INTO task_list (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number) VALUES (?, ?, ?, ?, ?, ?)',
-                    (id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number))
+                    'INSERT INTO task_list (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number, send_teacher_for_student_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    (id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number, current_date))
             send_message_ga(teacher_id,
                             f"{name_of_discipline}\nЗадача: {the_task_for_student}\nотправлена студентам группы {group_number}")
             cursor.execute("UPDATE task_for_student SET document = NULL WHERE id= ?", (id,))
@@ -1753,7 +1875,7 @@ def send_doc_for_teacher():
             for name in name_student:
                 student_name = name[0]
                 send_message_ga(teacher_id,
-                                f"Решение задачи №{task_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nОт студента:{student_name} группа {group_number} ")
+                                f"Решение задачи №{task_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nОт студента: {student_name} группа {group_number} ")
                 bot.send_document(teacher_id, open(f"{document}", "rb"))
                 cursor.execute("UPDATE task_list SET name_student = ? WHERE task_id = ?", (student_name, task_id))
             send_message_ga(student_id,
@@ -1782,15 +1904,13 @@ def send_coment_teacher():
                 FROM teachers 
                 WHERE teacher_id = ? """, (teacher_id,))
         name_teacher = cursor.fetchall()
-        cursor.execute(
-            'INSERT INTO statystic_for_teacher (send_date, student_id, teacher_id, name_of_discipline, group_number) VALUES (?, ?, ?, ?, ?)',
-            (current_date, student_id, teacher_id, name_of_discipline, group_number))
         for name in name_teacher:
             teacher_name = name[0]
             send_message_ga(student_id,
-                            f"КОММЕНТАРИЙ ПРЕПОДАВАТЕЛЯ:\n{teacher_name}\nОценка {mark} по №{task_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nКомментарий:{comment} ")
+                            f"КОММЕНТАРИЙ ПРЕПОДАВАТЕЛЯ:\n{teacher_name}\nОценка {mark} по №{task_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nКомментарий: {comment} ")
         send_message_ga(teacher_id,
                         f"Комментарий отправлен.")
+        cursor.execute("UPDATE task_list SET send_mark_date = ? WHERE task_id = ?", (current_date, task_id))
     conn.commit()
     conn.close()
 
