@@ -76,6 +76,9 @@ def registr(callback):
                                        lambda msg: send_task_for_teacher(msg, callback.message.chat.id))
 
     if callback.data == "statystic":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
         cursor.execute(
@@ -145,13 +148,15 @@ def registr(callback):
                                        lambda msg: ocenka(msg, callback.message.chat.id, mark, perems[0], perems[1]))
 
     if callback.data == "change_parol_teacher":
-        bot.send_message(callback.message.chat.id,
-                         "Пожалуйста, введите новый пароль:")
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Пожалуйста, введите новый пароль:")
         bot.register_next_step_handler(callback.message,
                                        lambda msg: change_parol_teacher(msg, callback.message.chat.id))
     if callback.data == "change_parol_student":
-        bot.send_message(callback.message.chat.id,
-                         "Пожалуйста, введите новый пароль:")
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Пожалуйста, введите новый пароль:")
         bot.register_next_step_handler(callback.message,
                                        lambda msg: change_parol_student(msg, callback.message.chat.id))
 
@@ -176,6 +181,9 @@ def registr(callback):
                               text="Ваш ответ принят.")
 
     if callback.data == "all_statystic":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
         cursor.execute(
@@ -881,7 +889,7 @@ def all_statystic(message, teacher_id, discipline):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     cursor.execute(
-        "SELECT group_number FROM task_for_student WHERE teacher_id = ? AND name_of_discipline = ?",
+        "SELECT DISTINCT group_number FROM task_for_student WHERE teacher_id = ? AND name_of_discipline = ?",
         (teacher_id, selected_discipline ))
     group_number = cursor.fetchall()
     connection.commit()
@@ -941,7 +949,7 @@ def all_statistic_date(message, teacher_id, selected_discipline, selected_group)
                     'incompleted_tasks': [],
                     'marks': []
                 }
-            if complete:
+            if complete == 1:
                 # Получаем оценку для выполненной задачи
                 cursor.execute(
                     """
@@ -963,37 +971,35 @@ def all_statistic_date(message, teacher_id, selected_discipline, selected_group)
                     student_stats[name_student]['marks'].append(mark)
             else:
                 student_stats[name_student]['incompleted_tasks'].append(task_id)
-        # Создаем новый документ
+
         doc = Document()
-        # Добавляем заголовок
         doc.add_heading(f'{selected_discipline}\nГруппа {selected_group}\n{date1_str} - {date2_str}', level=1)
-        # Создаем таблицу
         table = doc.add_table(rows=1, cols=4)
         table.style = 'Table Grid'
-        # Заголовки таблицы
+
         hdr_cells = table.rows[0].cells
         hdr_cells[0].text = 'Имя студента'
         hdr_cells[1].text = 'Выполненные задачи с оценками'
         hdr_cells[2].text = 'Невыполненные задачи'
         hdr_cells[3].text = 'Средний балл'
-        # Заполнение таблицы данными
+
         for name_student, stats in student_stats.items():
             completed_tasks_str = ', '.join([f'Задача {task_id}: {mark}' for task_id, mark in stats['completed_tasks']])
             incompleted_tasks_str = ', '.join(stats['incompleted_tasks'])
-            average_mark = sum(stats['marks']) / len(stats['marks']) if stats['marks'] else 0
-
+            average_mark = sum(stats['marks']) / len(stats['marks']) + len(stats['incompleted_tasks']) if stats['marks'] else 0
             row_cells = table.add_row().cells
             row_cells[0].text = name_student
             row_cells[1].text = completed_tasks_str
             row_cells[2].text = incompleted_tasks_str
             row_cells[3].text = f'{average_mark:.2f}'
-
-        # Сохранение документа
-        doc.save(f'statistics_{selected_group}_{selected_discipline}.docx')
+        document_name = f'statistics_{selected_group}_{selected_discipline}.docx'
+        doc.save(document_name)
+        bot.send_document(teacher_id, open(document_name, "rb"))
+        os.remove(document_name)
     except sqlite3.Error as e:
-        print(f"Ошибка при работе с базой данных: {e}")
+        bot.send_message(teacher_id, (f"Ошибка при работе с базой данных: {e}"))
     except ValueError:
-        print("Ошибка: Неверный формат даты. Пожалуйста, убедитесь, что даты введены корректно.")
+        bot.send_message(teacher_id, "Ошибка: Неверный формат даты. Пожалуйста, убедитесь, что даты введены корректно.")
 
 # ВЫВОДИМ СПИСОК СТУДЕНТОВ СДАВШИХ И НЕ СДАВШИХ РАБОТУ
 def statystics(message, teacher_id):
