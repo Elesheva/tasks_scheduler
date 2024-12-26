@@ -935,20 +935,20 @@ def all_statistic_date(message, teacher_id, selected_discipline, selected_group)
               AND name_of_discipline = ? 
               AND group_number = ? 
               AND send_teacher_for_student_date >= ? 
-              AND send_mark_date <= ?
+              AND send_teacher_for_student_date <= ?
             """,
             (teacher_id, selected_discipline, selected_group, date1_str, date2_str))
         all_results = cursor.fetchall()
-
         student_stats = {}
         for record in all_results:
             student_id, name_student, task_id, complete = record
-            if name_student not in student_stats:
-                student_stats[name_student] = {
+            if student_id not in student_stats:
+                student_stats[student_id] = {
                     'completed_tasks': [],
                     'incompleted_tasks': [],
                     'marks': []
                 }
+
             if complete == 1:
                 # Получаем оценку для выполненной задачи
                 cursor.execute(
@@ -967,10 +967,11 @@ def all_statistic_date(message, teacher_id, selected_discipline, selected_group)
                 mark = mark_result[0] if mark_result else None
 
                 if mark is not None:
-                    student_stats[name_student]['completed_tasks'].append((task_id, mark))
-                    student_stats[name_student]['marks'].append(mark)
+                    student_stats[student_id]['completed_tasks'].append((task_id, mark))
+                    student_stats[student_id]['marks'].append(mark)
             else:
-                student_stats[name_student]['incompleted_tasks'].append(task_id)
+
+                student_stats[student_id]['incompleted_tasks'].append(task_id)
 
         doc = Document()
         doc.add_heading(f'{selected_discipline}\nГруппа {selected_group}\n{date1_str} - {date2_str}', level=1)
@@ -983,12 +984,12 @@ def all_statistic_date(message, teacher_id, selected_discipline, selected_group)
         hdr_cells[2].text = 'Невыполненные задачи'
         hdr_cells[3].text = 'Средний балл'
 
-        for name_student, stats in student_stats.items():
+        for student_id, stats in student_stats.items():
             completed_tasks_str = ', '.join([f'Задача {task_id}: {mark}' for task_id, mark in stats['completed_tasks']])
-            incompleted_tasks_str = ', '.join(stats['incompleted_tasks'])
+            incompleted_tasks_str = ', '.join(str(stats['incompleted_tasks']))
             average_mark = sum(stats['marks']) / len(stats['marks']) + len(stats['incompleted_tasks']) if stats['marks'] else 0
             row_cells = table.add_row().cells
-            row_cells[0].text = name_student
+            row_cells[0].text = str(student_id)
             row_cells[1].text = completed_tasks_str
             row_cells[2].text = incompleted_tasks_str
             row_cells[3].text = f'{average_mark:.2f}'
@@ -1362,7 +1363,6 @@ def save_task(message, task_plan, user_id, what_time, regular, statys):
     if statys == 2:
         try:
             days, month = map(int, date_time.split('.'))
-            print(month, days)
             if 1 <= month <= 12 and 1 <= days < 32:
                 count_regular_task = 0
                 connection = sqlite3.connect('my_database.db')
