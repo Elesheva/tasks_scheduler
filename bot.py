@@ -2,6 +2,7 @@ import os
 from os.path import lexists
 from tokenize import group
 from docx import Document
+import matplotlib.pyplot as plt
 import telebot
 from pyexpat.errors import messages
 from telebot import types
@@ -866,14 +867,41 @@ def changing_grouppp(message, nomber, nomber_group):
         bot.send_message(message.chat.id, "Вы ввели неверное значение. Укажите курс:")
         bot.register_next_step_handler(message, lambda msg: changing_grouppp(msg, nomber, nomber_group))
 
-#Статистика для препода
+#Статистика для препода и студента
 @bot.message_handler(commands=['send_statistics'])
 def statis_teacher (message):
     teacher_id = message.chat.id
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Статистика по отправленной задаче", callback_data="statystic"))
-    markup.add(types.InlineKeyboardButton("Общая статистика, средний балл", callback_data="all_statystic"))
-    bot.send_message(teacher_id, f"Вас интересуют:", reply_markup=markup)
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (teacher_id,))
+    count_teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (teacher_id,))
+    count_student = cursor.fetchone()[0]
+    if count_teacher > 0 and count_student == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Статистика по отправленной задаче", callback_data="statystic"))
+        markup.add(types.InlineKeyboardButton("Общая статистика, средний балл", callback_data="all_statystic"))
+        bot.send_message(teacher_id, f"Вас интересуют:", reply_markup=markup)
+    if count_teacher == 0 and count_student > 0:
+        cursor.execute("SELECT complete, dont_complete FROM statystic_for_student WHERE student_id = ?", (teacher_id,))
+        statystic_for_student = cursor.fetchone()
+        if statystic_for_student:
+            for i in statystic_for_student:
+                complete, dont_complete = i
+                vals = [complete, dont_complete]
+                labels = ["Выполненные задачи", "Не выполненные задачи"]
+                plt.pie(vals, labels=labels)
+                plt.title("Количество выполненных и невыполненных задач за всё время")
+                plt.show()
+        else:
+            bot.send_message(teacher_id, "У вас нет задач.")
+    if count_teacher == 0 and count_student == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(teacher_id, "Чтобы начать работу с ботом необходимо пройти регистрацию. ", reply_markup=markup)
+    if count_teacher > 0 and count_student > 0:
+        delete_zapis(message)
+
 
 #СРЕДНИЙ БАЛЛ СТАТИСТИКА
 def all_statystic(message, teacher_id, discipline):
