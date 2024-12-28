@@ -871,54 +871,29 @@ def changing_grouppp(message, nomber, nomber_group):
 
 
 def create_pie_chart(vals, labels):
-    # Определяем размеры изображения
     width = 400
     height = 400
-    radius = min(width, height) // 2 - 10
-
-    # Создаем новое изображение
     image = Image.new('RGB', (width, height), 'white')
     draw = ImageDraw.Draw(image)
-
-    # Центр круга
-    center = (width // 2, height // 2)
-
-    # Вычисляем сумму всех значений для нормализации
     total = sum(vals)
-
-    # Начальный угол
     start_angle = 0
-
-    # Рисуем сектора и легенду
     legend_x = 10
     legend_y = 10
     legend_spacing = 20
-
-    # Загружаем шрифт Arial
-    font_path = "arial.ttf"  # Укажите путь к файлу шрифта
-    font = ImageFont.truetype(font_path, 12)  # Размер шрифта 24
+    font_path = "arial.ttf"
+    font = ImageFont.truetype(font_path, 12)
 
     for i in range(len(vals)):
         end_angle = start_angle + (vals[i] / total) * 360
-
-        # Используем разные цвета для каждого сектора
         color = tuple(int(x) for x in (255 * (i % 2), 100, 100))
-
-        # Рисуем сектор
         draw.pieslice([50, 50, width - 50, height - 50], start_angle, end_angle, fill=color)
-
-        # Добавляем легенду
         draw.rectangle([legend_x, legend_y + i * legend_spacing, legend_x + 15, legend_y + i * legend_spacing + 15],
                        fill=color)
         draw.text((legend_x + 20, legend_y + i * legend_spacing),
                   f"{labels[i]}: {vals[i]} ({vals[i] / total * 100:.1f}%)", fill="black", font=font)
-
         start_angle = end_angle
 
-
-
     return image
-
 
 #Статистика для препода и студента
 @bot.message_handler(commands=['send_statistics'])
