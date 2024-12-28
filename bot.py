@@ -901,7 +901,15 @@ def create_pie_chart(vals, labels):
     for i in range(len(vals)):
         end_angle = start_angle + (vals[i] / total) * 360
 
+        # Используем разные цвета для каждого сектора
+        color = tuple(int(x) for x in (255 * (i % 2), 100, 100))
 
+        # Рисуем сектор
+        draw.pieslice([50, 50, width - 50, height - 50], start_angle, end_angle, fill=color)
+
+        # Добавляем легенду
+        draw.rectangle([legend_x, legend_y + i * legend_spacing, legend_x + 15, legend_y + i * legend_spacing + 15],
+                       fill=color)
         draw.text((legend_x + 20, legend_y + i * legend_spacing),
                   f"{labels[i]}: {vals[i]} ({vals[i] / total * 100:.1f}%)", fill="black", font=font)
 
