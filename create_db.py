@@ -57,6 +57,7 @@ def create_db():
          )
      """)
 
+
     # Создание таблицы statystic_for_student (Результат по персональным задачам для студента)
     cursor.execute("""
          CREATE TABLE IF NOT EXISTS statystic_for_student (

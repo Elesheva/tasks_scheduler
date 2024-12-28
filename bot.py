@@ -1,8 +1,10 @@
 import os
+import math
 from os.path import lexists
 from tokenize import group
 from docx import Document
-import matplotlib.pyplot as plt
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
 import telebot
 from pyexpat.errors import messages
 from telebot import types
@@ -867,6 +869,49 @@ def changing_grouppp(message, nomber, nomber_group):
         bot.send_message(message.chat.id, "Вы ввели неверное значение. Укажите курс:")
         bot.register_next_step_handler(message, lambda msg: changing_grouppp(msg, nomber, nomber_group))
 
+
+def create_pie_chart(vals, labels):
+    # Определяем размеры изображения
+    width = 400
+    height = 400
+    radius = min(width, height) // 2 - 10
+
+    # Создаем новое изображение
+    image = Image.new('RGB', (width, height), 'white')
+    draw = ImageDraw.Draw(image)
+
+    # Центр круга
+    center = (width // 2, height // 2)
+
+    # Вычисляем сумму всех значений для нормализации
+    total = sum(vals)
+
+    # Начальный угол
+    start_angle = 0
+
+    # Рисуем сектора и легенду
+    legend_x = 10
+    legend_y = 10
+    legend_spacing = 20
+
+    # Загружаем шрифт Arial
+    font_path = "arial.ttf"  # Укажите путь к файлу шрифта
+    font = ImageFont.truetype(font_path, 12)  # Размер шрифта 24
+
+    for i in range(len(vals)):
+        end_angle = start_angle + (vals[i] / total) * 360
+
+
+        draw.text((legend_x + 20, legend_y + i * legend_spacing),
+                  f"{labels[i]}: {vals[i]} ({vals[i] / total * 100:.1f}%)", fill="black", font=font)
+
+        start_angle = end_angle
+
+
+
+    return image
+
+
 #Статистика для препода и студента
 @bot.message_handler(commands=['send_statistics'])
 def statis_teacher (message):
@@ -882,24 +927,34 @@ def statis_teacher (message):
         markup.add(types.InlineKeyboardButton("Статистика по отправленной задаче", callback_data="statystic"))
         markup.add(types.InlineKeyboardButton("Общая статистика, средний балл", callback_data="all_statystic"))
         bot.send_message(teacher_id, f"Вас интересуют:", reply_markup=markup)
-    if count_teacher == 0 and count_student > 0:
+    elif count_teacher == 0 and count_student > 0:
         cursor.execute("SELECT complete, dont_complete FROM statystic_for_student WHERE student_id = ?", (teacher_id,))
         statystic_for_student = cursor.fetchone()
+
         if statystic_for_student:
-            for i in statystic_for_student:
-                complete, dont_complete = i
-                vals = [complete, dont_complete]
-                labels = ["Выполненные задачи", "Не выполненные задачи"]
-                plt.pie(vals, labels=labels)
-                plt.title("Количество выполненных и невыполненных задач за всё время")
-                plt.show()
+            complete, dont_complete = statystic_for_student
+            vals = [complete, dont_complete]
+            labels = ["Выполненные задачи", "Не выполненные задачи"]
+
+            # Создание круговой диаграммы
+            pie_chart_image = create_pie_chart(vals, labels)
+
+            # Сохранение изображения в буфер
+            buf = BytesIO()
+            pie_chart_image.save(buf, format='PNG')
+            buf.seek(0)
+
+            # Отправка диаграммы пользователю
+            bot.send_photo(teacher_id, photo=buf)
+
         else:
             bot.send_message(teacher_id, "У вас нет задач.")
-    if count_teacher == 0 and count_student == 0:
+
+    elif count_teacher == 0 and count_student == 0:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
         bot.send_message(teacher_id, "Чтобы начать работу с ботом необходимо пройти регистрацию. ", reply_markup=markup)
-    if count_teacher > 0 and count_student > 0:
+    elif count_teacher > 0 and count_student > 0:
         delete_zapis(message)
 
 
@@ -1418,8 +1473,11 @@ def save_task(message, task_plan, user_id, what_time, regular, statys):
                 cursor.execute("SELECT COUNT (*) FROM statystic_for_student WHERE student_id = ?", (user_id,))
                 count_statystic_for_student = cursor.fetchone()[0]
                 if count_statystic_for_student == 0:
-                    cursor.execute('INSERT INTO statystic_for_student (student_id) VALUES (?)',
-                        (user_id,))
+                    complete = 0
+                    dont_complete = 0
+                    all_tasks = 0
+                    cursor.execute('INSERT INTO statystic_for_student (student_id, complete, dont_complete, all_tasks) VALUES (?, ?, ?, ?)',
+                        (user_id, complete, dont_complete, all_tasks))
                 connection.commit()
                 connection.close()
                 bot.send_message(message.chat.id, "Задача добавлена!")
