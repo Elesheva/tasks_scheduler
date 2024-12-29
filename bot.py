@@ -1650,22 +1650,36 @@ def task_list(message):
     student_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute(
-        "SELECT id, name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ",
-        (student_id,))
-    tasks = cursor.fetchall()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
+    count_teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
+    count_student = cursor.fetchone()[0]
+    if count_teacher > 0 and count_student > 0:
+        delete_zapis(message)
+    elif count_teacher > 0 and count_student == 0:
+        bot.send_message(message.chat.id, "Функция доступна только студентам.")
+    elif count_teacher == 0 and count_student > 0:
+        cursor.execute(
+            "SELECT id, name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ",
+            (student_id,))
+        tasks = cursor.fetchall()
+        output = "".join(f"{i + 1}) {tasks[i][1]}\nЗАДАЧА:\n{tasks[i][2]}, не выполнено\n" for i in range(len(tasks)))
+        if tasks:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("Отправить решение преподавателю", callback_data="send_completed_task"))
+            bot.send_message(message.chat.id, f"{message.from_user.first_name}, все ваши задачи:\n{output}",
+                             reply_markup=markup)
+        else:
+            bot.send_message(message.chat.id, f'{message.from_user.first_name}, у вас нет задач от преподавателя.')
+    else:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "У вас нет учётной записи. Для того, чтобы создать задачу необходимо зарегистрироваться.",
+                         reply_markup=markup)
     connection.commit()
     connection.close()
-    output = "".join(f"{i + 1}) {tasks[i][1]}\nЗАДАЧА:\n{tasks[i][2]}, не выполнено\n" for i in range(len(tasks)))
-    print(output)
-    if tasks:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Отправить решение преподавателю", callback_data="send_completed_task"))
-        bot.send_message(message.chat.id, f"{message.from_user.first_name}, все ваши задачи:\n{output}",
-                         reply_markup=markup)
-    else:
-        bot.send_message(message.chat.id, f'{message.from_user.first_name}, у вас нет задач от преподавателя.')
-
 
 def send_task_for_teacher(message, student_id):
     try:
@@ -1725,29 +1739,46 @@ def get_all_tasks_from_db(message):
     user_id = message.from_user.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("SELECT task, task_time, date FROM tasks WHERE user_id = ?", (user_id,))
-    tasks = cursor.fetchall()
-    cursor.execute(
-        "SELECT task_id, name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ",
-        (user_id,))
-    tasks_from_teacher = cursor.fetchall()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
+    count_teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
+    count_student = cursor.fetchone()[0]
+    if count_teacher > 0 and count_student > 0:
+        delete_zapis(message)
+    elif count_teacher > 0 and count_student == 0:
+        bot.send_message(message.chat.id, "Функция доступна только студентам.")
+    elif count_teacher == 0 and count_student > 0:
+        cursor.execute("SELECT task, task_time, date FROM tasks WHERE user_id = ?", (user_id,))
+        tasks = cursor.fetchall()
+        cursor.execute(
+            "SELECT task_id, name_of_discipline, the_task_for_student FROM task_list WHERE student_id = ? AND complete IS NULL ",
+            (user_id,))
+        tasks_from_teacher = cursor.fetchall()
+        connection.commit()
+        connection.close()
+        output = "".join(f"{i + 1}) {tasks[i][0]} в {tasks[i][1]}, {tasks[i][2]}\n" for i in range(len(tasks)))
+        output_task_from_teacher = "".join(
+            f"Задача №{tasks_from_teacher[i][0]}\n {tasks_from_teacher[i][1]}\nЗадание:{tasks_from_teacher[i][2]}\n" for
+            i
+            in range(len(tasks_from_teacher)))
+        if len(output) != 0:
+            bot.send_message(message.chat.id,
+                             f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
+            bot.send_message(message.chat.id, output)
+
+        if len(output_task_from_teacher) != 0:
+            bot.send_message(message.chat.id, output_task_from_teacher)
+        else:
+            bot.send_message(message.chat.id,
+                             f'{message.from_user.first_name}, у вас нет задач.')
+    else:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "У вас нет учётной записи. Для того, чтобы создать задачу необходимо зарегистрироваться.",
+                         reply_markup=markup)
     connection.commit()
     connection.close()
-    output = "".join(f"{i + 1}) {tasks[i][0]} в {tasks[i][1]}, {tasks[i][2]}\n" for i in range(len(tasks)))
-    output_task_from_teacher = "".join(
-        f"Задача №{tasks_from_teacher[i][0]}\n {tasks_from_teacher[i][1]}\nЗадание:{tasks_from_teacher[i][2]}\n" for i
-        in range(len(tasks_from_teacher)))
-    if len(output) != 0:
-        bot.send_message(message.chat.id,
-                         f"{message.from_user.first_name} {message.from_user.last_name}, все ваши задачи:")
-        bot.send_message(message.chat.id, output)
-
-    if len(output_task_from_teacher) != 0:
-        bot.send_message(message.chat.id, output_task_from_teacher)
-    else:
-        bot.send_message(message.chat.id,
-                         f'{message.from_user.first_name}, у вас нет задач.')
-
 
 # УДАЛЕНИЕ ЗАДАЧИ ИЗ БД
 @bot.message_handler(commands=['delete_tasks'])
