@@ -214,37 +214,44 @@ def register_name(message):
 
 # РЕГИСТРАЦИЯ СТУДЕНТОВ
 def register_student(message, name, student_id):
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (student_id,))
+    teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (student_id,))
+    count = cursor.fetchone()[0]
     if message.text == "1":
         status = 1
         # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
-        connection = sqlite3.connect('my_database.db')
-        cursor = connection.cursor()
-        cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (student_id,))
-        count = cursor.fetchone()[0]
-        if count > 0:
+        if count > 0 and teacher == 0:
             bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
             changing_student(message, student_id)
-        else:
+        elif count == 0 and teacher > 0:
+            bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
+            changing_teacher(message, student_id)
+        elif count > 0 and teacher > 0:
+            bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
+        elif count == 0 and teacher == 0:
             bot.send_message(student_id, "Введите пароль: ")
             bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id, status))
     elif message.text == "2":
-        print(2)
         status = 2
-        connection = sqlite3.connect('my_database.db')
-        cursor = connection.cursor()
-        cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (student_id,))
-        count = cursor.fetchone()[0]
-        if count > 0:
+        # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+        if count > 0 and teacher == 0:
+            bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
+            changing_student(message, student_id)
+        elif count == 0 and teacher > 0:
             bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
             changing_teacher(message, student_id)
-        else:
+        elif count > 0 and teacher > 0:
+            bot.send_message(message.chat.id, f"{name}, вы уже зарегистрированы")
+        elif count == 0 and teacher == 0:
             bot.send_message(student_id, "Введите пароль: ")
             bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id, status))
     else:
         bot.send_message(message.chat.id,
                          f"{name}, вы ввели неверное значение, попробуйте ещё раз.\nВы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
         bot.register_next_step_handler(message, lambda msg: register_student(msg, name, student_id))
-
 
 def proverka_parol(message, name, student_id, status):
     parol = message.text
@@ -653,36 +660,47 @@ def changing_db_teacher(message, teacher_id, nomber):
     cursor = connection.cursor()
     if nomber == '1':
         cursor.execute("UPDATE teachers SET name = ? WHERE teacher_id= ?", (new, teacher_id))
-        connection.commit()
-        connection.close()
         bot.send_message(message.chat.id, "Вы поменяли ФИО")
         changing_teacher(message, teacher_id)
     if nomber == "2":
         cursor.execute("UPDATE teachers SET phone_number = ? WHERE teacher_id= ?", (new, teacher_id))
-        connection.commit()
-        connection.close()
         bot.send_message(message.chat.id, "Вы поменяли номер телефона")
         changing_teacher(message, teacher_id)
     if nomber == "3":
         cursor.execute("UPDATE teachers SET mail = ? WHERE teacher_id= ?", (new, teacher_id))
-        connection.commit()
-        connection.close()
         bot.send_message(message.chat.id, "Вы поменяли почту")
         changing_teacher(message, teacher_id)
     if nomber == "4":
         cursor.execute("UPDATE teachers SET department = ? WHERE teacher_id= ?", (new, teacher_id))
-        connection.commit()
-        connection.close()
         bot.send_message(message.chat.id, "Вы поменяли кафедру")
         changing_teacher(message, teacher_id)
-
+    connection.commit()
+    connection.close()
 
 # Функции для преподавателя
 # ДОБАВЛЕНИЕ ПРЕПОДАВАТЕЛЕМ ДАННЫХ В ТАБЛИЦУ ДИСЦИПЛИНА
 @bot.message_handler(commands=['add_discipline'])
 def add_data_to_table_discipline(message):
-    bot.send_message(message.chat.id, "Введите название вашей дисциплины:")
-    bot.register_next_step_handler(message, lambda msg: to_table_discipline(msg, message.from_user.id))
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
+    teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
+    student = cursor.fetchone()[0]
+    # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+    if student > 0 and teacher == 0:
+        bot.send_message(message.chat.id, f"Вы зарегистрированы как студент. Функция доступна преподавателю.")
+    elif student == 0 and teacher > 0:
+        bot.send_message(message.chat.id, "Введите название вашей дисциплины:")
+        bot.register_next_step_handler(message, lambda msg: to_table_discipline(msg, message.from_user.id))
+    elif student > 0 and teacher > 0:
+        bot.send_message(message.chat.id, f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
+    elif student == 0 and teacher == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id, "Вы не зарегистрированы. Для того, чтобы продолжить, необходимо пройти регистрацию. ", reply_markup = markup)
+    connection.commit()
+    connection.close()
 
 
 def to_table_discipline(message, teacher_id):
@@ -766,18 +784,34 @@ def groap_table(message):
     teacher_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("SELECT id, faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
-    faculty = cursor.fetchall()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
+    teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
+    student = cursor.fetchone()[0]
+    # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+    if student > 0 and teacher == 0:
+        bot.send_message(message.chat.id, f"Вы зарегистрированы как студент. Функция доступна преподавателю.")
+    elif student == 0 and teacher > 0:
+        cursor.execute("SELECT id, faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
+        faculty = cursor.fetchall()
+        if not faculty:
+            bot.send_message(message.chat.id, "Нет доступных факультетов.")
+            return
+        output = "".join(f"{faculty[i][0]}) {faculty[i][1]}\n" for i in range(len(faculty)))
+        bot.send_message(message.chat.id,
+                         f"Вы создали следующие факультеты:\n{output}\nУкажите номер факультета, в котором создаётся группа:")
+        bot.register_next_step_handler(message, lambda msg: to_table_groap(msg, teacher_id, faculty))
+    elif student > 0 and teacher > 0:
+        bot.send_message(message.chat.id,
+                         f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
+    elif student == 0 and teacher == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "Вы не зарегистрированы. Для того, чтобы продолжить, необходимо пройти регистрацию. ",
+                         reply_markup=markup)
     connection.commit()
     connection.close()
-    if not faculty:
-        bot.send_message(message.chat.id, "Нет доступных факультетов.")
-        return
-    output = "".join(f"{faculty[i][0]}) {faculty[i][1]}\n" for i in range(len(faculty)))
-    bot.send_message(message.chat.id,
-                     f"Вы создали следующие факультеты:\n{output}\nУкажите номер факультета, в котором создаётся группа:")
-    print(output)
-    bot.register_next_step_handler(message, lambda msg: to_table_groap(msg, teacher_id, faculty))
 
 
 def to_table_groap(message, teacher_id, faculty):
@@ -913,32 +947,26 @@ def statis_teacher (message):
     elif count_teacher == 0 and count_student > 0:
         cursor.execute("SELECT complete, dont_complete FROM statystic_for_student WHERE student_id = ?", (teacher_id,))
         statystic_for_student = cursor.fetchone()
-
         if statystic_for_student:
             complete, dont_complete = statystic_for_student
             vals = [complete, dont_complete]
             labels = ["Выполненные задачи", "Не выполненные задачи"]
-
-            # Создание круговой диаграммы
             pie_chart_image = create_pie_chart(vals, labels)
-
-            # Сохранение изображения в буфер
             buf = BytesIO()
             pie_chart_image.save(buf, format='PNG')
             buf.seek(0)
-
             # Отправка диаграммы пользователю
             bot.send_photo(teacher_id, photo=buf)
-
         else:
             bot.send_message(teacher_id, "У вас нет задач.")
-
     elif count_teacher == 0 and count_student == 0:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
         bot.send_message(teacher_id, "Чтобы начать работу с ботом необходимо пройти регистрацию. ", reply_markup=markup)
     elif count_teacher > 0 and count_student > 0:
         delete_zapis(message)
+    connection.commit()
+    connection.close()
 
 
 #СРЕДНИЙ БАЛЛ СТАТИСТИКА
@@ -1036,12 +1064,12 @@ def all_statistic_date(message, teacher_id, selected_discipline, selected_group)
                     student_stats[name_student]['marks'].append(mark)
             else:
                 student_stats[name_student]['incompleted_tasks'].append(task_id)
-
+        connection.commit()
+        connection.close()
         doc = Document()
         doc.add_heading(f'{selected_discipline}\nГруппа {selected_group}\n{date1_str} - {date2_str}', level=1)
         table = doc.add_table(rows=1, cols=4)
         table.style = 'Table Grid'
-
         hdr_cells = table.rows[0].cells
         hdr_cells[0].text = 'Имя студента'
         hdr_cells[1].text = 'Выполненные задачи с оценками'
@@ -1066,6 +1094,7 @@ def all_statistic_date(message, teacher_id, selected_discipline, selected_group)
         bot.send_message(teacher_id, (f"Ошибка при работе с базой данных: {e}"))
     except ValueError:
         bot.send_message(teacher_id, "Ошибка: Неверный формат даты. Пожалуйста, убедитесь, что даты введены корректно.")
+
 
 # ВЫВОДИМ СПИСОК СТУДЕНТОВ СДАВШИХ И НЕ СДАВШИХ РАБОТУ
 def statystics(message, teacher_id):
@@ -1126,22 +1155,39 @@ def complete_task(message):
     teacher_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute(
-        "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1",
-        (teacher_id,))
-    info_send_task = cursor.fetchall()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
+    teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
+    student = cursor.fetchone()[0]
+    # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+    if student > 0 and teacher == 0:
+        bot.send_message(message.chat.id, f"Вы зарегистрированы как студент. Функция доступна преподавателю.")
+    elif student == 0 and teacher > 0:
+        cursor.execute(
+            "SELECT id, name_of_discipline, group_number, the_task_for_student, send_time, send_date FROM task_for_student WHERE teacher_id = ? AND statys = 1",
+            (teacher_id,))
+        info_send_task = cursor.fetchall()
+        if info_send_task:
+            output = "".join(
+                f"\n{info_send_task[i][0]}) {info_send_task[i][2]} {info_send_task[i][1]}\nЗадача:\n{info_send_task[i][3]}\nотправлено в {info_send_task[i][4]} {info_send_task[i][5]}"
+                for i in
+                range(len(info_send_task)))
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Отправить оценку", callback_data="send_mark"))
+            bot.send_message(message.chat.id, f"Вы отправили задачи:{output}", reply_markup=markup)
+        else:
+            bot.send_message(message.chat.id, f"У вас нет отправленных задач.")
+    elif student > 0 and teacher > 0:
+        bot.send_message(message.chat.id,
+                         f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
+    elif student == 0 and teacher == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "Вы не зарегистрированы. Для того, чтобы продолжить, необходимо пройти регистрацию. ",
+                         reply_markup=markup)
     connection.commit()
     connection.close()
-    if info_send_task:
-        output = "".join(
-            f"\n{info_send_task[i][0]}) {info_send_task[i][2]} {info_send_task[i][1]}\nЗадача:\n{info_send_task[i][3]}\nотправлено в {info_send_task[i][4]} {info_send_task[i][5]}"
-            for i in
-            range(len(info_send_task)))
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Отправить оценку", callback_data="send_mark"))
-        bot.send_message(message.chat.id, f"Вы отправили задачи:{output}", reply_markup=markup)
-    else:
-        bot.send_message(message.chat.id, f"У вас нет отправленных задач.")
 
 def send_comment(message, teacher_id):
     try:
@@ -1236,19 +1282,38 @@ def info(message):
     teacher_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    cursor.execute("SELECT faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
-    count_teacher = cursor.fetchall()
-    for i in count_teacher:
-        faculty = i[0]
-        cursor.execute("SELECT name, phone_number, mail, group_number FROM student WHERE faculty = ?", (faculty,))
-        info_ab = cursor.fetchall()
-        connection.commit()
-        connection.close()
-        output = "".join(f"{i+1}) {info_ab[i][0]}, {info_ab[i][1]}, {info_ab[i][2]} ГРУППА {info_ab[i][3]} " for i in
-                         range(len(info_ab)))
-        bot.send_message(teacher_id, f"{output}")
-    if not count_teacher:
-        bot.send_message(teacher_id, "Нет студентов, которые зарегистрированы в вашем факультете")
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
+    teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
+    student = cursor.fetchone()[0]
+    # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+    if student > 0 and teacher == 0:
+        bot.send_message(message.chat.id, f"Вы зарегистрированы как студент. Функция доступна преподавателю.")
+    elif student == 0 and teacher > 0:
+        cursor.execute("SELECT faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
+        count_teacher = cursor.fetchall()
+        for i in count_teacher:
+            faculty = i[0]
+            cursor.execute("SELECT name, phone_number, mail, group_number FROM student WHERE faculty = ?", (faculty,))
+            info_ab = cursor.fetchall()
+            output = "".join(
+                f"{i + 1}) {info_ab[i][0]}, {info_ab[i][1]}, {info_ab[i][2]} ГРУППА {info_ab[i][3]} " for i in
+                range(len(info_ab)))
+            bot.send_message(teacher_id, f"{output}")
+        if not count_teacher:
+            bot.send_message(teacher_id, "Нет студентов, которые зарегистрированы в вашем факультете")
+    elif student > 0 and teacher > 0:
+        bot.send_message(message.chat.id,
+                         f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
+    elif student == 0 and teacher == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "Вы не зарегистрированы. Для того, чтобы продолжить, необходимо пройти регистрацию. ",
+                         reply_markup=markup)
+    connection.commit()
+    connection.close()
+
 # Удаляем учётную запись
 @bot.message_handler(commands=['delete_account'])
 def delete_zapis(message):
@@ -1337,12 +1402,6 @@ def delete_user(message, user_id, statys):
 @bot.message_handler(commands=['add_regular_task', 'add_task'])
 def new_task(message):
     regular = None
-    if message.text == "/add_regular_task":
-        regular = True
-    else:
-        regular = False
-    print(message.text)
-    print(regular)
     user_id = message.from_user.id
     # ПРОВЕРКА РЕГИСТРАЦИИ ПОЛЬЗОВАТЕЛЯ
     connection = sqlite3.connect('my_database.db')
@@ -1357,19 +1416,25 @@ def new_task(message):
         delete_zapis(message)
     elif count_teacher > 0 and count_student == 0:
         statys = 1
-        bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
-        bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular, statys))
+        if message.text == "/add_regular_task":
+            regular = False
+            bot.send_message(message.chat.id, "Функция доступна только студентам.")
+        else:
+            regular = False
+            bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
+            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular, statys))
     elif count_teacher == 0 and count_student > 0:
         statys = 2
-        bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
-        bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular, statys))
+        if message.text == "/add_regular_task":
+            regular = True
+            bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
+            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular, statys))
     else:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
         bot.send_message(message.chat.id,
                          "У вас нет учётной записи. Для того, чтобы создать задачу необходимо зарегистрироваться.",
                          reply_markup=markup)
-
 
 def whattime(message, user_id, regular, statys):
     regular = regular
