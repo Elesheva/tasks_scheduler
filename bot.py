@@ -1149,6 +1149,42 @@ def statystics(message, teacher_id):
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
 
+@bot.message_handler(commands=['send_message_for_student'])
+def send_message_for_student(message):
+    teacher_id = message.chat.id
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
+    teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
+    student = cursor.fetchone()[0]
+    # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+    if student > 0 and teacher == 0:
+        bot.send_message(message.chat.id, f"Вы зарегистрированы как студент. Функция доступна преподавателю.")
+    elif student == 0 and teacher > 0:
+        cursor.execute("SELECT DISTINCT faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
+        count_teacher = cursor.fetchall()
+        for i in count_teacher:
+            faculty = i[0]
+            cursor.execute("SELECT DISTINCT group_number FROM student WHERE faculty = ?", (faculty,))
+            info_ab = cursor.fetchall()
+            output = "".join(
+                f"{i + 1}) {info_ab[i][0]} " for i in
+                range(len(info_ab)))
+            bot.send_message(teacher_id, f"{output}")
+        if not count_teacher:
+            bot.send_message(teacher_id, "Нет студентов, которые зарегистрированы в вашем факультете")
+    elif student > 0 and teacher > 0:
+        bot.send_message(message.chat.id,
+                         f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
+    elif student == 0 and teacher == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "Вы не зарегистрированы. Для того, чтобы продолжить, необходимо пройти регистрацию. ",
+                         reply_markup=markup)
+    connection.commit()
+    connection.close()
 
 @bot.message_handler(commands=['send_mark'])
 def complete_task(message):
