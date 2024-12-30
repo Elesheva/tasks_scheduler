@@ -197,7 +197,7 @@ def registr(callback):
         connection.close()
         if discipline:
             output = "".join(
-                f"\n{i+1}) {discipline[i][0]} "
+                f"\n{i + 1}) {discipline[i][0]} "
                 for i in
                 range(len(discipline)))
             bot.send_message(callback.message.chat.id,
@@ -211,6 +211,7 @@ def register_name(message):
     bot.send_message(message.chat.id,
                      f"{name}, вы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
     bot.register_next_step_handler(message, lambda msg: register_student(msg, name, message.chat.id))
+
 
 # РЕГИСТРАЦИЯ СТУДЕНТОВ
 def register_student(message, name, student_id):
@@ -253,6 +254,7 @@ def register_student(message, name, student_id):
                          f"{name}, вы ввели неверное значение, попробуйте ещё раз.\nВы являетесь:\n1. Студентом МУИВ\n2. Преподавателем МУИВ\nВведите номер:")
         bot.register_next_step_handler(message, lambda msg: register_student(msg, name, student_id))
 
+
 def proverka_parol(message, name, student_id, status):
     parol = message.text
     connection = sqlite3.connect('my_database.db')
@@ -280,6 +282,7 @@ def proverka_parol(message, name, student_id, status):
         else:
             bot.send_message(message.chat.id, "Вы ввели неправильный пароль. Попробуйте ещё раз:")
             bot.register_next_step_handler(message, lambda msg: proverka_parol(msg, name, student_id, status))
+
 
 def student_nomber(message, name, student_id):
     phone_nomber = message.text
@@ -531,7 +534,6 @@ def nomber_change(message):
         bot.register_next_step_handler(message, nomber_change)
 
 
-
 def changing_db_student(message, student_id, nomber, info_about_faculty):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
@@ -677,6 +679,7 @@ def changing_db_teacher(message, teacher_id, nomber):
     connection.commit()
     connection.close()
 
+
 # Функции для преподавателя
 # ДОБАВЛЕНИЕ ПРЕПОДАВАТЕЛЕМ ДАННЫХ В ТАБЛИЦУ ДИСЦИПЛИНА
 @bot.message_handler(commands=['add_discipline'])
@@ -694,11 +697,14 @@ def add_data_to_table_discipline(message):
         bot.send_message(message.chat.id, "Введите название вашей дисциплины:")
         bot.register_next_step_handler(message, lambda msg: to_table_discipline(msg, message.from_user.id))
     elif student > 0 and teacher > 0:
-        bot.send_message(message.chat.id, f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
+        bot.send_message(message.chat.id,
+                         f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
     elif student == 0 and teacher == 0:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
-        bot.send_message(message.chat.id, "Вы не зарегистрированы. Для того, чтобы продолжить, необходимо пройти регистрацию. ", reply_markup = markup)
+        bot.send_message(message.chat.id,
+                         "Вы не зарегистрированы. Для того, чтобы продолжить, необходимо пройти регистрацию. ",
+                         reply_markup=markup)
     connection.commit()
     connection.close()
 
@@ -929,9 +935,10 @@ def create_pie_chart(vals, labels):
 
     return image
 
-#Статистика для препода и студента
+
+# Статистика для препода и студента
 @bot.message_handler(commands=['send_statistics'])
-def statis_teacher (message):
+def statis_teacher(message):
     teacher_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
@@ -969,7 +976,7 @@ def statis_teacher (message):
     connection.close()
 
 
-#СРЕДНИЙ БАЛЛ СТАТИСТИКА
+# СРЕДНИЙ БАЛЛ СТАТИСТИКА
 def all_statystic(message, teacher_id, discipline):
     try:
         discipline_number = int(message.text)
@@ -984,7 +991,7 @@ def all_statystic(message, teacher_id, discipline):
     cursor = connection.cursor()
     cursor.execute(
         "SELECT DISTINCT group_number FROM task_for_student WHERE teacher_id = ? AND name_of_discipline = ?",
-        (teacher_id, selected_discipline ))
+        (teacher_id, selected_discipline))
     group_number = cursor.fetchall()
     connection.commit()
     connection.close()
@@ -994,9 +1001,11 @@ def all_statystic(message, teacher_id, discipline):
             for i in
             range(len(group_number)))
         bot.send_message(teacher_id, f"Введите номер группы:\n{output}")
-        bot.register_next_step_handler(message, lambda msg: all_statistic_g(msg, teacher_id, selected_discipline, group_number))
+        bot.register_next_step_handler(message,
+                                       lambda msg: all_statistic_g(msg, teacher_id, selected_discipline, group_number))
     else:
         bot.send_message(teacher_id, "Вы ещё не отправляли задания для этой группы.")
+
 
 def all_statistic_g(message, teacher_id, selected_discipline, group_number):
     try:
@@ -1008,9 +1017,11 @@ def all_statistic_g(message, teacher_id, selected_discipline, group_number):
         print("Ошибка: Номер группы вне диапазона.")
         return
     selected_group = group_number[group - 1][0]
-    bot.send_message(teacher_id, f"Теперь необходимо задать временной диапазоню\nВведите с какого числа и по какое вывести статистику.\n Пример: 10.10.2024-20.12.2024")
+    bot.send_message(teacher_id,
+                     f"Теперь необходимо задать временной диапазоню\nВведите с какого числа и по какое вывести статистику.\n Пример: 10.10.2024-20.12.2024")
     bot.register_next_step_handler(message,
                                    lambda msg: all_statistic_date(msg, teacher_id, selected_discipline, selected_group))
+
 
 def all_statistic_date(message, teacher_id, selected_discipline, selected_group):
     date = message.text.strip()
@@ -1079,7 +1090,8 @@ def all_statistic_date(message, teacher_id, selected_discipline, selected_group)
         for name_student, stats in student_stats.items():
             completed_tasks_str = ', '.join([f'Задача {task_id}: {mark}' for task_id, mark in stats['completed_tasks']])
             incompleted_tasks_str = ', '.join([f'Задача {task_id}' for task_id in stats['incompleted_tasks']])
-            average_mark = sum(stats['marks']) / (len(stats['marks']) + len(stats['incompleted_tasks'])) if stats['marks'] else 0
+            average_mark = sum(stats['marks']) / (len(stats['marks']) + len(stats['incompleted_tasks'])) if stats[
+                'marks'] else 0
             row_cells = table.add_row().cells
 
             row_cells[0].text = str(name_student)
@@ -1149,6 +1161,7 @@ def statystics(message, teacher_id):
     if not have:
         bot.send_message(teacher_id, "Такого номера нет.")
 
+
 @bot.message_handler(commands=['send_message_for_student'])
 def send_message_for_student(message):
     teacher_id = message.chat.id
@@ -1171,7 +1184,9 @@ def send_message_for_student(message):
             output = "".join(
                 f"{i + 1}) {info_ab[i][0]} " for i in
                 range(len(info_ab)))
-            bot.send_message(teacher_id, f"{output}")
+            bot.send_message(teacher_id, f"{output}\nВведите номер группы:")
+            bot.register_next_step_handler(message,
+                                           lambda msg: send_message_for_studenttt(msg, teacher_id, info_ab))
         if not count_teacher:
             bot.send_message(teacher_id, "Нет студентов, которые зарегистрированы в вашем факультете")
     elif student > 0 and teacher > 0:
@@ -1185,6 +1200,20 @@ def send_message_for_student(message):
                          reply_markup=markup)
     connection.commit()
     connection.close()
+
+
+def send_message_for_studenttt(message, teacher_id, info_ab):
+    try:
+        nomber = int(message.text)
+    except ValueError:
+        bot.send_message(teacher_id,
+                         "Неверный номер. Попробуйте ещё раз:")
+        bot.register_next_step_handler(message,
+                                       lambda msg: send_comment(msg, teacher_id))
+        return
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+
 
 @bot.message_handler(commands=['send_mark'])
 def complete_task(message):
@@ -1224,6 +1253,7 @@ def complete_task(message):
                          reply_markup=markup)
     connection.commit()
     connection.close()
+
 
 def send_comment(message, teacher_id):
     try:
@@ -1312,7 +1342,8 @@ def ocenka(message, teacher_id, mark, id, nomber):
         bot.send_message(teacher_id,
                          f"Ваш комментарий:\nОценка {mark}\n{comment}\nБудет отправлен через 1 минуту. Вам придёт уведомление")
 
-#Получаем информацию о студентах
+
+# Получаем информацию о студентах
 @bot.message_handler(commands=['info_about_student'])
 def info(message):
     teacher_id = message.chat.id
@@ -1349,6 +1380,7 @@ def info(message):
                          reply_markup=markup)
     connection.commit()
     connection.close()
+
 
 # Удаляем учётную запись
 @bot.message_handler(commands=['delete_account'])
@@ -1472,6 +1504,7 @@ def new_task(message):
                          "У вас нет учётной записи. Для того, чтобы создать задачу необходимо зарегистрироваться.",
                          reply_markup=markup)
 
+
 def whattime(message, user_id, regular, statys):
     regular = regular
     task_plan = message.text
@@ -1560,7 +1593,8 @@ def save_task(message, task_plan, user_id, what_time, regular, statys):
                     complete = 0
                     dont_complete = 0
                     all_tasks = 0
-                    cursor.execute('INSERT INTO statystic_for_student (student_id, complete, dont_complete, all_tasks) VALUES (?, ?, ?, ?)',
+                    cursor.execute(
+                        'INSERT INTO statystic_for_student (student_id, complete, dont_complete, all_tasks) VALUES (?, ?, ?, ?)',
                         (user_id, complete, dont_complete, all_tasks))
                 connection.commit()
                 connection.close()
@@ -1717,6 +1751,7 @@ def task_list(message):
     connection.commit()
     connection.close()
 
+
 def send_task_for_teacher(message, student_id):
     try:
         nomber = int(message.text)
@@ -1815,6 +1850,7 @@ def get_all_tasks_from_db(message):
                          reply_markup=markup)
     connection.commit()
     connection.close()
+
 
 # УДАЛЕНИЕ ЗАДАЧИ ИЗ БД
 @bot.message_handler(commands=['delete_tasks'])
@@ -1924,7 +1960,8 @@ def delete_tasks_from_db(message, proverka_id, statys):
     finally:
         connection.close()
 
-#МЕНЯЕМ ПАРОЛЬ (АДМИНИСТРАТОР)
+
+# МЕНЯЕМ ПАРОЛЬ (АДМИНИСТРАТОР)
 @bot.message_handler(commands=['change_parol'])
 def change_parol(message):
     user_id = message.chat.id
@@ -1932,8 +1969,8 @@ def change_parol(message):
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT(*) FROM parol WHERE id_admin = ?", (user_id,))
     count = cursor.fetchone()[0]
-    #При смене администратора удалить строчки: "if count >0:" ; "else: bot.send_message(user_id, "Пароль изменяет только администратор.")"
-    if count >0:
+    # При смене администратора удалить строчки: "if count >0:" ; "else: bot.send_message(user_id, "Пароль изменяет только администратор.")"
+    if count > 0:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Преподаватели", callback_data="change_parol_teacher"))
         markup.add(types.InlineKeyboardButton("Студенты", callback_data="change_parol_student"))
@@ -1941,12 +1978,13 @@ def change_parol(message):
     else:
         bot.send_message(user_id, "Пароль изменяет только администратор.")
 
-def change_parol_teacher (message, user_id):
+
+def change_parol_teacher(message, user_id):
     new_parol = message.text
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
-    #ПРИ СМЕНЕ АДМИНА ДОБАВИТЬ СТРОЧКИ:
-    #cursor.execute('INSERT INTO parol (id_admin) VALUES (?)',
+    # ПРИ СМЕНЕ АДМИНА ДОБАВИТЬ СТРОЧКИ:
+    # cursor.execute('INSERT INTO parol (id_admin) VALUES (?)',
     #               (user_id,))
     cursor.execute("""UPDATE parol 
                             SET parol_for_teacher = ?
@@ -1955,6 +1993,7 @@ def change_parol_teacher (message, user_id):
     bot.send_message(user_id, "Новый пароль для преподавателей установлен.")
     connection.commit()
     connection.close()
+
 
 def change_parol_student(message, user_id):
     new_parol = message.text
@@ -1968,6 +2007,7 @@ def change_parol_student(message, user_id):
     connection.commit()
     connection.close()
 
+
 @bot.message_handler(commands=['settings'])
 def settings(message):
     connection = sqlite3.connect('my_database.db')
@@ -1978,42 +2018,44 @@ def settings(message):
     student = cursor.fetchone()[0]
     # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
     if student > 0 and teacher == 0:
-        bot.send_message(message.chat.id, f"Инструкция по использованию Телеграмм-бота.\n1. Начало работы\nЗапустите бота командой"
-                                          f" /start и пройдите регистрацию. Чтобы успешно пройти регистрацию необходим код-пароль, "
-                                          f"который может сообщить вам администратор. Код необходим для подтверждения вашей роли как "
-                                          f"студента.\n2. Получение заданий.\nПосле регистрации вам будут приходить уведомления от "
-                                          f"преподавателя с задачами. Чтобы посмотреть все ваши задачи необходимо ввести команду /all_tasks"
-                                          f"\n3. Отправка решения.\nКоманда для отправки решения /task_from_the_teacher. Выберите номер задания от преподавателя "
-                                          f"по которому хотите отправить решение. Прикрепите файл с вашим решением (Документ любого формата). "
-                                          f"После этого ваша работа будет отправлена преподавателю и вам придёт уведомление об успешной отправке.\n4. Создание задачи\n"
-                                          f"Вы можете запланировать собственную задачу командой /add_task. Необходимо ввести корректные дату и время, в которое хотите получить напоминание. "
-                                          f"Бот запомнит информацию и пришлёт вам напоминание в нужное время.\n5. Создание регулярной задачи.\n"
-                                          f"Введите команду /add_regular_task и укажите те же данные, "
-                                          f"что и при создании обычной задачи. Напомнинание будет приходить вам каждый день в указанное вами время.\n6. Статистика.\n"
-                                          f"Вы сможете увидеть статистику, если введёте команду /send_statistics.\n7. Удаление задачи.\nВведите команду /delete_tasks для того, чтобы удалить "
-                                          f"регулярную или обычную задачу.\n8. Удалить аккаунт.\nВведите команду /delete_account для того, чтобы удалить все данные о себе."
-                                           )
+        bot.send_message(message.chat.id,
+                         f"Инструкция по использованию Телеграмм-бота.\n1. Начало работы\nЗапустите бота командой"
+                         f" /start и пройдите регистрацию. Чтобы успешно пройти регистрацию необходим код-пароль, "
+                         f"который может сообщить вам администратор. Код необходим для подтверждения вашей роли как "
+                         f"студента.\n2. Получение заданий.\nПосле регистрации вам будут приходить уведомления от "
+                         f"преподавателя с задачами. Чтобы посмотреть все ваши задачи необходимо ввести команду /all_tasks"
+                         f"\n3. Отправка решения.\nКоманда для отправки решения /task_from_the_teacher. Выберите номер задания от преподавателя "
+                         f"по которому хотите отправить решение. Прикрепите файл с вашим решением (Документ любого формата). "
+                         f"После этого ваша работа будет отправлена преподавателю и вам придёт уведомление об успешной отправке.\n4. Создание задачи\n"
+                         f"Вы можете запланировать собственную задачу командой /add_task. Необходимо ввести корректные дату и время, в которое хотите получить напоминание. "
+                         f"Бот запомнит информацию и пришлёт вам напоминание в нужное время.\n5. Создание регулярной задачи.\n"
+                         f"Введите команду /add_regular_task и укажите те же данные, "
+                         f"что и при создании обычной задачи. Напомнинание будет приходить вам каждый день в указанное вами время.\n6. Статистика.\n"
+                         f"Вы сможете увидеть статистику, если введёте команду /send_statistics.\n7. Удаление задачи.\nВведите команду /delete_tasks для того, чтобы удалить "
+                         f"регулярную или обычную задачу.\n8. Удалить аккаунт.\nВведите команду /delete_account для того, чтобы удалить все данные о себе."
+                         )
 
     elif student == 0 and teacher > 0:
-        bot.send_message(message.chat.id, f"Инструкция по использованию Телеграмм-бота.\n1. Начало работы\nЗапустите бота командой"
-                                          f" /start и пройдите регистрацию. Чтобы успешно пройти регистрацию необходим код-пароль, "
-                                          f"который может сообщить вам администратор. Код необходим для подтверждения вашей роли как "
-                                          f"преподавателя.\n2. Создание дисциплины.\n Введите команду /add_discipline для создания новой дисциплины, "
-                                          f"по которой будут отправляться задания для студентов.\n3. Создание группы.\n Создать группу вы сможете командой /add_group. После этого "
-                                          f"она будет доступна для регистрации студентов."
-                                          f"\n3. Отправка оценки.\nКоманда для отправки оценки /send_mark. Выберите номер решения от студента "
-                                          f"по которому хотите отправить оценку и введите оценку и ваш комментарий по работе. После этого вся информация будет отправлена студенту и оценка будет"
-                                          f" отражена в отчётном документе.\n4. Отправка задания.\n Введите команду /add_task, после чего необходимо выбрать группу, которой будет отправлена задача. "
-                                          f"Задача будет отправлена каждому участнику группы, который зарегистрирован в ней. Прикрепите файл с вашим заданием (Документ любого формата) и выберите"
-                                          f" время, в которое необходимо осуществить отпраку."
-                                          f"После этого ваше задание будет отправлено студентам и вам придёт уведомление об успешной отправке.\n4. Информация о студентах.\n "
-                                          f"Введите команду /info_about_student, чтобы получать контактные данные студента, почту, номер телефона, которые указывал студент при регистрации.\n6. Статистика.\n"
-                                          f"Вы сможете увидеть статистику, если введёте команду /send_statistics. На выбор будет два варианта, где 1 - краткая сводка о количестве выполненных и "
-                                          f"невыполненных задач и 2 - Отчёт за указанный вами временной промежуток, где будет информация по каждому чтуденту группы, количество выполненных работ, все оценки и средний балл."
-                                          f"\n7. Удаление задачи.\nВведите команду /delete_tasks для того, чтобы удалить "
-                                          f"задачу. После удаления об этом придёт уведомление всем студентам, которым эта задача была отправлена."
-                                          f"\n8. Удалить аккаунт.\nВведите команду /delete_account для того, чтобы удалить все данные о себе."
-                                           )
+        bot.send_message(message.chat.id,
+                         f"Инструкция по использованию Телеграмм-бота.\n1. Начало работы\nЗапустите бота командой"
+                         f" /start и пройдите регистрацию. Чтобы успешно пройти регистрацию необходим код-пароль, "
+                         f"который может сообщить вам администратор. Код необходим для подтверждения вашей роли как "
+                         f"преподавателя.\n2. Создание дисциплины.\n Введите команду /add_discipline для создания новой дисциплины, "
+                         f"по которой будут отправляться задания для студентов.\n3. Создание группы.\n Создать группу вы сможете командой /add_group. После этого "
+                         f"она будет доступна для регистрации студентов."
+                         f"\n3. Отправка оценки.\nКоманда для отправки оценки /send_mark. Выберите номер решения от студента "
+                         f"по которому хотите отправить оценку и введите оценку и ваш комментарий по работе. После этого вся информация будет отправлена студенту и оценка будет"
+                         f" отражена в отчётном документе.\n4. Отправка задания.\n Введите команду /add_task, после чего необходимо выбрать группу, которой будет отправлена задача. "
+                         f"Задача будет отправлена каждому участнику группы, который зарегистрирован в ней. Прикрепите файл с вашим заданием (Документ любого формата) и выберите"
+                         f" время, в которое необходимо осуществить отпраку."
+                         f"После этого ваше задание будет отправлено студентам и вам придёт уведомление об успешной отправке.\n4. Информация о студентах.\n "
+                         f"Введите команду /info_about_student, чтобы получать контактные данные студента, почту, номер телефона, которые указывал студент при регистрации.\n6. Статистика.\n"
+                         f"Вы сможете увидеть статистику, если введёте команду /send_statistics. На выбор будет два варианта, где 1 - краткая сводка о количестве выполненных и "
+                         f"невыполненных задач и 2 - Отчёт за указанный вами временной промежуток, где будет информация по каждому чтуденту группы, количество выполненных работ, все оценки и средний балл."
+                         f"\n7. Удаление задачи.\nВведите команду /delete_tasks для того, чтобы удалить "
+                         f"задачу. После удаления об этом придёт уведомление всем студентам, которым эта задача была отправлена."
+                         f"\n8. Удалить аккаунт.\nВведите команду /delete_account для того, чтобы удалить все данные о себе."
+                         )
 
     elif student > 0 and teacher > 0:
         bot.send_message(message.chat.id,
@@ -2028,10 +2070,10 @@ def settings(message):
     connection.close()
 
 
-
 # НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ (Преподаватель)
 def send_message_ga(user_id, message):
     bot.send_message(chat_id=user_id, text=f"{message}")
+
 
 # НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ (Студент)
 def send_message_ga_student(user_id, message):
@@ -2039,6 +2081,7 @@ def send_message_ga_student(user_id, message):
     markup.add(types.InlineKeyboardButton("Выполнено", callback_data="done"))
     markup.add(types.InlineKeyboardButton("Не выполнено", callback_data="dont_done"))
     bot.send_message(chat_id=user_id, text=f"НАПОМИНАНИЕ: {message}", reply_markup=markup)
+
 
 # ОТПРАВЛЕНИЕ ПЕРСОНАЛЬНОЙ ЗАДАЧИ СТУДЕНТА
 def check_tasks():
@@ -2131,7 +2174,8 @@ def send_doc():
                                    (student_name, student_id))
                     cursor.execute(
                         'INSERT INTO task_list (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number, send_teacher_for_student_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        (id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number, current_date))
+                        (id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number,
+                         current_date))
             send_message_ga(teacher_id,
                             f"{name_of_discipline}\nЗадача: {the_task_for_student}\nотправлена студентам группы {group_number}")
             cursor.execute("UPDATE task_for_student SET document = NULL WHERE id= ?", (id,))
