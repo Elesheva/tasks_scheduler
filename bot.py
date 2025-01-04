@@ -39,7 +39,6 @@ def send_welcome(message):
                          f"Здравствуйте, {message.from_user.first_name} {lastname} 👋 Я ваш персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
                          , reply_markup=markup)
 
-
 @bot.callback_query_handler(func=lambda callback: True)
 def registr(callback):
     if callback.data == "registration" or callback.data == "Регистрация":
@@ -204,7 +203,74 @@ def registr(callback):
                              f"Пожалуйста, выберите дисциплину:\n{output}")
             bot.register_next_step_handler(callback.message,
                                            lambda msg: all_statystic(msg, callback.message.chat.id, discipline))
+#НАСТРОЙКИ
+    if callback.data == "changing_settings_student":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        changing_student(callback.message, callback.message.chat.id)
+    if callback.data == "changing_settings_teacher":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        changing_teacher(callback.message, callback.message.chat.id)
 
+    if callback.data == "delete_account":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        delete_zapis(callback.message)
+
+    if callback.data == "all_discipline":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        select_data_for_teacher(callback.message, callback.message.chat.id)
+
+    if callback.data == "all_grupp":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        spisok_grupp(callback.message)
+
+    if callback.data == "info_about_student":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        info(callback.message)
+
+    if callback.data == "change_parol":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        change_parol(callback.message)
+
+#ЗАДАЧИ СТУДЕНТОВ
+    if callback.data == "add_task":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        text = "add_task"
+        new_task(callback.message, text)
+
+    if callback.data == "add_regular_task":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        text = "add_regular_task"
+        new_task(callback.message, text)
+
+    if callback.data == "all_tasks":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        get_all_tasks_from_db(callback.message)
+
+    if callback.data == "task_from_the_teacher":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается")
+        task_list(callback.message)
 
 def register_name(message):
     name = message.text
@@ -679,7 +745,7 @@ def changing_db_teacher(message, teacher_id, nomber):
 
 # Функции для преподавателя
 # ДОБАВЛЕНИЕ ПРЕПОДАВАТЕЛЕМ ДАННЫХ В ТАБЛИЦУ ДИСЦИПЛИНА
-@bot.message_handler(commands=['add_discipline'])
+
 def add_data_to_table_discipline(message):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
@@ -692,7 +758,7 @@ def add_data_to_table_discipline(message):
         bot.send_message(message.chat.id, f"Вы зарегистрированы как студент. Функция доступна преподавателю.")
     elif student == 0 and teacher > 0:
         bot.send_message(message.chat.id, "Введите название вашей дисциплины:")
-        bot.register_next_step_handler(message, lambda msg: to_table_discipline(msg, message.from_user.id))
+        bot.register_next_step_handler(message, lambda msg: to_table_discipline(msg, message.chat.id))
     elif student > 0 and teacher > 0:
         bot.send_message(message.chat.id, f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
     elif student == 0 and teacher == 0:
@@ -729,14 +795,16 @@ def select_data_for_teacher(message, teacher_id):
     info_about_discipline = cursor.fetchall()
     connection.commit()
     connection.close()
-    output = "".join(
-        f"{info_about_discipline[i][0]}) {info_about_discipline[i][1]}, {info_about_discipline[i][2]}\n"
-        for i in range(len(info_about_discipline)))
-    print(output)
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Поменять наименование дисциплины", callback_data="changing"))
-    markup.add(types.InlineKeyboardButton("Добавить дисциплину", callback_data="add"))
-    bot.send_message(message.chat.id, f"Дисциплины:\n{output}", reply_markup=markup)
+    if len(info_about_discipline) > 0 :
+        output = "".join(
+            f"{info_about_discipline[i][0]}) {info_about_discipline[i][1]}, {info_about_discipline[i][2]}\n"
+            for i in range(len(info_about_discipline)))
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Поменять наименование дисциплины", callback_data="changing"))
+        markup.add(types.InlineKeyboardButton("Добавить дисциплину", callback_data="add"))
+        bot.send_message(message.chat.id, f"Дисциплины:\n{output}", reply_markup=markup)
+    else:
+        bot.send_message(teacher_id, "У вас нет созданных дисциплин.")
 
 
 # МЕНЯЕМ НАЗВАНИЕ ДИСЦИПЛИНЫ
@@ -779,7 +847,7 @@ def changing_disceplineee(message, nomber, discepline):
 
 
 # ДОБАВЛЯЕМ ГРУППУ
-@bot.message_handler(commands=['add_group'])
+
 def groap_table(message):
     teacher_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
@@ -930,7 +998,7 @@ def create_pie_chart(vals, labels):
     return image
 
 #Статистика для препода и студента
-@bot.message_handler(commands=['send_statistics'])
+@bot.message_handler(commands=['statistics'])
 def statis_teacher (message):
     teacher_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
@@ -1357,7 +1425,7 @@ def ocenka(message, teacher_id, mark, id, nomber):
                          f"Ваш комментарий:\nОценка {mark}\n{comment}\nБудет отправлен через 1 минуту. Вам придёт уведомление")
 
 #Получаем информацию о студентах
-@bot.message_handler(commands=['info_about_student'])
+
 def info(message):
     teacher_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
@@ -1479,10 +1547,10 @@ def delete_user(message, user_id, statys):
 
 
 # ДОБАВЛЕНИЕ РЕГУЛЯРНОЙ (СТУДЕНТ) И НЕРЕГЕГУЛЯРНОЙ ЗАДАЧИ (СТУДЕНТ И ПРЕПОДАВАТЕЛЬ)
-@bot.message_handler(commands=['add_regular_task', 'add_task'])
-def new_task(message):
+
+def new_task(message, text):
     regular = None
-    user_id = message.from_user.id
+    user_id = message.chat.id
     # ПРОВЕРКА РЕГИСТРАЦИИ ПОЛЬЗОВАТЕЛЯ
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
@@ -1496,19 +1564,25 @@ def new_task(message):
         delete_zapis(message)
     elif count_teacher > 0 and count_student == 0:
         statys = 1
-        if message.text == "/add_regular_task":
+        if text == "add_regular_task":
             regular = False
             bot.send_message(message.chat.id, "Функция доступна только студентам.")
         else:
             regular = False
             bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
-            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular, statys))
+            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.chat.id, regular, statys))
     elif count_teacher == 0 and count_student > 0:
         statys = 2
-        if message.text == "/add_regular_task":
+        print(message.text)
+        if text == "add_regular_task":
             regular = True
             bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
-            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.from_user.id, regular, statys))
+            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.chat.id, regular, statys))
+            print("add_regular_task")
+        else:
+            regular = False
+            bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
+            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.chat.id, regular, statys))
     else:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
@@ -1724,8 +1798,8 @@ def document_number_statys_teacher_1(message, task_plan, user_id, what_time, dat
                                                                                     facultet, group_number, course))
 
 
-# ДЛЯ СТУДЕНТОВ
-@bot.message_handler(commands=['task_from_the_teacher'])
+# ДЛЯ СТУДЕНТОВ ВСЕ ЗАДАЧИ ОТ ПРЕПОДАВАТЕЛЯ/ ОТПРАВИТЬ РЕШЕНИЕ
+
 def task_list(message):
     student_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
@@ -1814,9 +1888,9 @@ def send_document_for_teacher(message, student_id, tasks_id):
 
 
 # ДОСТАЁМ ВСЕ ЗАДАЧИ ИЗ БД
-@bot.message_handler(commands=['all_tasks'])
+
 def get_all_tasks_from_db(message):
-    user_id = message.from_user.id
+    user_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
@@ -1863,7 +1937,7 @@ def get_all_tasks_from_db(message):
 # УДАЛЕНИЕ ЗАДАЧИ ИЗ БД
 @bot.message_handler(commands=['delete_tasks'])
 def delete_task_from_db(message):
-    user_id = message.from_user.id
+    user_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (user_id,))
@@ -1921,7 +1995,7 @@ def delete_task_from_db(message):
 
 def delete_tasks_from_db(message, proverka_id, statys):
     id = message.text
-    user_id = message.from_user.id
+    user_id = message.chat.id
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
     try:
@@ -2012,7 +2086,7 @@ def change_parol_student(message, user_id):
     connection.commit()
     connection.close()
 
-@bot.message_handler(commands=['settings'])
+@bot.message_handler(commands=['manual'])
 def settings(message):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
@@ -2071,8 +2145,84 @@ def settings(message):
     connection.commit()
     connection.close()
 
+@bot.message_handler(commands=['settings'])
+def settings(message):
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
+    teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
+    student = cursor.fetchone()[0]
+    # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+    if student > 0 and teacher == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_student"))
+        markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
+        bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup = markup)
+    elif student == 0 and teacher > 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_teacher"))
+        markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
+        markup.add(types.InlineKeyboardButton("Создать дисциплину", callback_data="add"))
+        markup.add(types.InlineKeyboardButton("Все дисциплины", callback_data="all_discipline"))
+        markup.add(types.InlineKeyboardButton("Создать группу", callback_data="add_group"))
+        markup.add(types.InlineKeyboardButton("Все группы", callback_data="all_grupp"))
+        markup.add(types.InlineKeyboardButton("Информация о студентах", callback_data="info_about_student"))
+        markup.add(types.InlineKeyboardButton("Изменить пароль (администратор)", callback_data="change_parol"))
+        bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
+    elif student > 0 and teacher > 0:
+        bot.send_message(message.chat.id,
+                         f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
+    elif student == 0 and teacher == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "Вы не зарегистрированы. Для того, чтобы продолжить, необходимо пройти регистрацию. ",
+                         reply_markup=markup)
+    connection.commit()
+    connection.close()
 
-
+@bot.message_handler(commands=['my_tasks'])
+def settings(message):
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT (*) FROM teachers WHERE teacher_id = ?", (message.chat.id,))
+    teacher = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
+    student = cursor.fetchone()[0]
+    # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
+    if student > 0 and teacher == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Создать напоминание", callback_data="add_task"))
+        markup.add(types.InlineKeyboardButton("Добавить регулярное напоминание", callback_data="add_regular_task"))
+        markup.add(types.InlineKeyboardButton("Все мои задачи", callback_data="all_tasks"))
+        markup.add(types.InlineKeyboardButton("Отправить решение преподавателю", callback_data="task_from_the_teacher"))
+        bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup = markup)
+    elif student == 0 and teacher > 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_teacher"))
+        markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
+        markup.add(types.InlineKeyboardButton("Создать дисциплину", callback_data="add"))
+        markup.add(types.InlineKeyboardButton("Все дисциплины", callback_data="all_discipline"))
+        markup.add(types.InlineKeyboardButton("Создать группу", callback_data="add_group"))
+        markup.add(types.InlineKeyboardButton("Все группы", callback_data="all_grupp"))
+        markup.add(types.InlineKeyboardButton("Информация о студентах", callback_data="info_about_student"))
+        markup.add(types.InlineKeyboardButton("Изменить пароль (администратор)", callback_data="change_parol"))
+        bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
+    elif student > 0 and teacher > 0:
+        bot.send_message(message.chat.id,
+                         f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
+    elif student == 0 and teacher == 0:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+        bot.send_message(message.chat.id,
+                         "Вы не зарегистрированы. Для того, чтобы продолжить, необходимо пройти регистрацию. ",
+                         reply_markup=markup)
+    connection.commit()
+    connection.close()
 # НАПОМИНАНИЕ ПОЛЬЗОВАТЕЛЮ (Преподаватель)
 def send_message_ga(user_id, message):
     bot.send_message(chat_id=user_id, text=f"{message}")
