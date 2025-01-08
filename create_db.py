@@ -143,6 +143,16 @@ def create_db():
             id_admin INTEGER
         )
     """)
+
+    # Создание таблицы с обращениями к администратору
+    cursor.execute("""
+                CREATE TABLE IF NOT EXISTS admin (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_user INTEGER,
+                    text_for_admin TEXT
+                )
+            """)
+
     connection.commit()
     cursor.close()
     connection.close()

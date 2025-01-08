@@ -1,21 +1,10 @@
 import os
-import math
-from os.path import lexists
-from tokenize import group
 from docx import Document
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import telebot
-from pyexpat.errors import messages
 from telebot import types
 import create_db
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, Application, MessageHandler, CallbackContext
-from datetime import datetime
-import time
-import threading
-from pytz import utc
-
 from apscheduler.schedulers.background import BackgroundScheduler
 import sqlite3
 from datetime import datetime, timedelta
@@ -32,11 +21,13 @@ def send_welcome(message):
     lastname = message.from_user.last_name
     if lastname is None:
         bot.send_message(message.chat.id,
-                         f"Здравствуйте, {message.chat.first_name} 👋 Я ваш персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
+                         f"Здравствуйте, {message.chat.first_name} 👋 Я ваш персональный помощник по планированию задач.\n"
+                         f"Чтобы начать работу с ботом необходимо пройти регистрацию."
                          , reply_markup=markup)
     else:
         bot.send_message(message.chat.id,
-                         f"Здравствуйте, {message.chat.first_name} {lastname} 👋 Я ваш персональный помощник по планированию задач.\nЧтобы начать работу с ботом необходимо пройти регистрацию."
+                         f"Здравствуйте, {message.chat.first_name} {lastname} 👋 Я ваш персональный помощник по планированию задач.\n"
+                         f"Чтобы начать работу с ботом необходимо пройти регистрацию."
                          , reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda callback: True)
@@ -271,7 +262,14 @@ def registr(callback):
                               text="Ваш запрос обрабатывается...")
         change_parol(callback.message)
 
-#ЗАДАЧИ СТУДЕНТОВ
+    if callback.data == "text_for_admin":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Вы хотите отправить обращение к администратору. В обращении вам нужно подробно изложить сущность вашего обращения. Это поможет администратору быстрее решить проблему. Пожалуйста, введите текст:")
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: for_admin(msg))
+
+#ЗАДАЧИ
     if callback.data == "add_task":
         bot.edit_message_text(chat_id=callback.message.chat.id,
                               message_id=callback.message.message_id,
@@ -315,6 +313,17 @@ def registr(callback):
                               message_id=callback.message.message_id,
                               text="Ваш запрос обрабатывается...")
         send_message_for_student(callback.message)
+
+    if callback.data == "user_text":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается...")
+        obrashenya_ot_user(callback.message)
+
+    if callback.data == "otvet_for_user":
+        bot.send_message(callback.message.chat.id, "Введите номер обращения:")
+        bot.register_next_step_handler(callback.message,
+                                       lambda msg: otvet_user(msg))
 
 def register_name(message):
     name = message.text
@@ -2080,6 +2089,68 @@ def delete_tasks_from_db(message, proverka_id, statys):
     finally:
         connection.close()
 
+def for_admin(message):
+    user_id = message.chat.id
+    text = message.text
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT id_admin FROM parol")
+    id_admin = cursor.fetchone()
+    id_admin = id_admin[0]
+    cursor.execute("INSERT INTO admin (id_user, text_for_admin) VALUES (?, ?)", (user_id, text))
+    connection.commit()
+    connection.close()
+    bot.send_message(user_id, "Обращение зарегистрировано.")
+    bot.send_message(id_admin, f"Обращение от пользователя {user_id}\n{text}")
+
+def obrashenya_ot_user(message):
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM admin")
+    text = cursor.fetchall()
+    connection.commit()
+    connection.close()
+    if len(text) > 0:
+        output = "".join(f"{x[0]} - Пользователь: {x[1]}\n{x[2]}\n" for x in text)
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("Отправить ответ на обращение", callback_data="otvet_for_user"))
+        bot.send_message(message.chat.id, f"Список обращений:\n{output}", reply_markup=markup)
+    else:
+        bot.send_message(message.chat.id, "Список обращений пуст.")
+
+def otvet_user(message):
+    try:
+        nomber = int(message.text)
+    except ValueError:
+        bot.send_message(message.chat.id,
+                         "Неверный номер. Попробуйте ещё раз.")
+        bot.register_next_step_handler(message,
+                                       lambda msg: obrashenya_ot_user(msg))
+        return
+
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("SELECT id_user FROM admin WHERE id = ?", (nomber,))
+    tasks = cursor.fetchone()
+    if not tasks:
+        bot.send_message(message.chat.id, f'Обращение с таким номером не найдено.')
+        return
+    user_id = tasks[0]
+    bot.send_message(message.chat.id, "Введите текст с ответом:")
+    bot.register_next_step_handler(message, lambda msg: delete_text_from_db(msg, user_id, nomber))
+    connection.commit()
+    connection.close()
+
+def delete_text_from_db(message, user_id, nomber):
+    text = message.text
+    bot.send_message(user_id, f"Ответ администратора: {text}")
+    bot.send_message(message.chat.id, f"Ваш ответ отправлен пользователю.")
+    connection = sqlite3.connect('my_database.db')
+    cursor = connection.cursor()
+    cursor.execute("DELETE FROM admin WHERE id = ?", (nomber,))
+    connection.commit()
+    connection.close()
+
 #МЕНЯЕМ ПАРОЛЬ (АДМИНИСТРАТОР)
 @bot.message_handler(commands=['change_parol'])
 def change_parol(message):
@@ -2088,6 +2159,8 @@ def change_parol(message):
     cursor = connection.cursor()
     cursor.execute("SELECT COUNT(*) FROM parol WHERE id_admin = ?", (user_id,))
     count = cursor.fetchone()[0]
+    connection.commit()
+    connection.close()
     #При смене администратора удалить строчки: "if count >0:" ; "else: bot.send_message(user_id, "Пароль изменяет только администратор.")"
     if count >0:
         markup = types.InlineKeyboardMarkup()
@@ -2144,6 +2217,7 @@ def settings(message):
                                           f"\n\n6. Удалить напоминание \nПерейдите по пути «Мои задачи»-«Удалить напоминание» для того, чтобы удалить персональное напоминание."
                                           f"\n\n7. Статистика\nВы сможете увидеть статистику, если введёте команду /statistics. Вам придёт круговая диаграмма, на которой будут отражены выплненные и невыполненные вами задачи. "
                                           f"\n\n8. Удалить аккаунт\nПерейдите по пути «Настройки»-«Удалить аккаунт» для того, чтобы удалить все данные о себе. Чтобы начать работать с ботом вам прийдется снова пройти регистрацию. Ваши данные полностью будут удалены."
+                                          f"\n\n9. Обращение к администратору\nЕсли бот вам выдаёт ошибку или некорректно выводит данные, то вы можете обратиться за помощью к администратору, если перейдёте поп пути «Настройки»-«Обращение к администратору»"
                                            )
 
     elif student == 0 and teacher > 0:
@@ -2163,7 +2237,7 @@ def settings(message):
                                           f"\n\n7. Статистика\nВы сможете увидеть статистику, если введёте команду /statistics. На выбор будет два варианта: где 1 - краткая сводка о количестве выполненных и невыполненных задач, и 2 - Отчёт, в формате документа word, за указанный вами временной промежуток, где будет информация по каждому студенту группы, количество выполненных работ, все оценки и средний балл. "
                                           f"\n\n8. Удаление задачи\nПерейдите по пути «Мои задачи»-«Удалить задачу» для того, чтобы удалить задачу. После удаления, об этом придёт уведомление всем студентам, которым эта задача была отправлена."
                                           f"\n\n9. Удалить аккаунт\nПерейдите по пути «Настройки»-«Удалить аккаунт» для того, чтобы удалить все данные о себе. Чтобы начать работать с ботом вам прийдется снова пройти регистрацию. Ваши данные полностью будут удалены."
-                                           )
+                                          f"\n\n10. Обращение к администратору\nЕсли бот вам выдаёт ошибку или некорректно выводит данные, то вы можете обратиться за помощью к администратору, если перейдёте поп пути «Настройки»-«Обращение к администратору»")
 
     elif student > 0 and teacher > 0:
         bot.send_message(message.chat.id,
@@ -2185,25 +2259,42 @@ def settings(message):
     teacher = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
     student = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM parol WHERE id_admin = ?", (message.chat.id,))
+    admin = cursor.fetchone()[0]
     # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
     if student > 0 and teacher == 0:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
         markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_student"))
         markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
+        markup.add(types.InlineKeyboardButton("Обращение к администратору", callback_data="text_for_admin"))
         bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup = markup)
     elif student == 0 and teacher > 0:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
-        markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_teacher"))
-        markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
-        markup.add(types.InlineKeyboardButton("Создать дисциплину", callback_data="add"))
-        markup.add(types.InlineKeyboardButton("Все дисциплины", callback_data="all_discipline"))
-        markup.add(types.InlineKeyboardButton("Создать группу", callback_data="add_group"))
-        markup.add(types.InlineKeyboardButton("Все группы", callback_data="all_grupp"))
-        markup.add(types.InlineKeyboardButton("Информация о студентах", callback_data="info_about_student"))
-        markup.add(types.InlineKeyboardButton("Изменить пароль (администратор)", callback_data="change_parol"))
-        bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
+        if admin > 0:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Изменить пароль (администратор)", callback_data="change_parol"))
+            markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+            markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_teacher"))
+            markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
+            markup.add(types.InlineKeyboardButton("Создать дисциплину", callback_data="add"))
+            markup.add(types.InlineKeyboardButton("Все дисциплины", callback_data="all_discipline"))
+            markup.add(types.InlineKeyboardButton("Создать группу", callback_data="add_group"))
+            markup.add(types.InlineKeyboardButton("Все группы", callback_data="all_grupp"))
+            markup.add(types.InlineKeyboardButton("Информация о студентах", callback_data="info_about_student"))
+            markup.add(types.InlineKeyboardButton("Обращение к администратору", callback_data="text_for_admin"))
+            bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
+        else:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+            markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_teacher"))
+            markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
+            markup.add(types.InlineKeyboardButton("Создать дисциплину", callback_data="add"))
+            markup.add(types.InlineKeyboardButton("Все дисциплины", callback_data="all_discipline"))
+            markup.add(types.InlineKeyboardButton("Создать группу", callback_data="add_group"))
+            markup.add(types.InlineKeyboardButton("Все группы", callback_data="all_grupp"))
+            markup.add(types.InlineKeyboardButton("Информация о студентах", callback_data="info_about_student"))
+            markup.add(types.InlineKeyboardButton("Обращение к администратору", callback_data="text_for_admin"))
+            bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
     elif student > 0 and teacher > 0:
         bot.send_message(message.chat.id,
                          f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
@@ -2224,22 +2315,46 @@ def settings(message):
     teacher = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT (*) FROM student WHERE student_id = ?", (message.chat.id,))
     student = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT (*) FROM parol WHERE id_admin = ?", (message.chat.id,))
+    admin = cursor.fetchone()[0]
     # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
     if student > 0 and teacher == 0:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Создать напоминание", callback_data="add_task"))
-        markup.add(types.InlineKeyboardButton("Добавить регулярное напоминание", callback_data="add_regular_task"))
-        markup.add(types.InlineKeyboardButton("Все мои задачи", callback_data="all_tasks"))
-        markup.add(types.InlineKeyboardButton("Отправить решение преподавателю", callback_data="task_from_the_teacher"))
-        markup.add(types.InlineKeyboardButton("Удалить напоминание", callback_data="delete_tasks"))
-        bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
+        if admin > 0:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Обращения от пользователей", callback_data="user_text"))
+            markup.add(types.InlineKeyboardButton("Создать напоминание", callback_data="add_task"))
+            markup.add(types.InlineKeyboardButton("Добавить регулярное напоминание", callback_data="add_regular_task"))
+            markup.add(types.InlineKeyboardButton("Все мои задачи", callback_data="all_tasks"))
+            markup.add(
+                types.InlineKeyboardButton("Отправить решение преподавателю", callback_data="task_from_the_teacher"))
+            markup.add(types.InlineKeyboardButton("Удалить напоминание", callback_data="delete_tasks"))
+            bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
+        else:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Создать напоминание", callback_data="add_task"))
+            markup.add(types.InlineKeyboardButton("Добавить регулярное напоминание", callback_data="add_regular_task"))
+            markup.add(types.InlineKeyboardButton("Все мои задачи", callback_data="all_tasks"))
+            markup.add(types.InlineKeyboardButton("Отправить решение преподавателю", callback_data="task_from_the_teacher"))
+            markup.add(types.InlineKeyboardButton("Удалить напоминание", callback_data="delete_tasks"))
+            bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
     elif student == 0 and teacher > 0:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Создать задачу", callback_data="add_task"))
-        markup.add(types.InlineKeyboardButton("Удалить задачу (студентам придёт уведомление об удалении)", callback_data="delete_tasks"))
-        markup.add(types.InlineKeyboardButton("Оценить работу студента", callback_data="send_markk"))
-        markup.add(types.InlineKeyboardButton("Отправить уведомление студентам", callback_data="send_message_for_student"))
-        bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
+        if admin >0:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Обращения от пользователей", callback_data="user_text"))
+            markup.add(types.InlineKeyboardButton("Создать задачу", callback_data="add_task"))
+            markup.add(types.InlineKeyboardButton("Удалить задачу (студентам придёт уведомление об удалении)",
+                                                  callback_data="delete_tasks"))
+            markup.add(types.InlineKeyboardButton("Оценить работу студента", callback_data="send_markk"))
+            markup.add(
+                types.InlineKeyboardButton("Отправить уведомление студентам", callback_data="send_message_for_student"))
+            bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
+        else:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Создать задачу", callback_data="add_task"))
+            markup.add(types.InlineKeyboardButton("Удалить задачу (студентам придёт уведомление об удалении)", callback_data="delete_tasks"))
+            markup.add(types.InlineKeyboardButton("Оценить работу студента", callback_data="send_markk"))
+            markup.add(types.InlineKeyboardButton("Отправить уведомление студентам", callback_data="send_message_for_student"))
+            bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
     elif student > 0 and teacher > 0:
         bot.send_message(message.chat.id,
                          f"Вы зарегистрированы и как преподаватель и как студент. Невозможно продолжить работу.")
