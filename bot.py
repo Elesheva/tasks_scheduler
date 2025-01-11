@@ -1,5 +1,5 @@
 import os
-from docx import Document
+
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import telebot
@@ -8,7 +8,7 @@ import create_db
 from apscheduler.schedulers.background import BackgroundScheduler
 import sqlite3
 from datetime import datetime, timedelta
-
+from docx import Document
 bot = telebot.TeleBot('7206218529:AAGXx1IkHVxZ3IrFt09Xgzytanj1n-bpcUI')
 
 
@@ -38,20 +38,14 @@ def registr(callback):
                               text="Пожалуйста, введите свое ФИО")
         bot.register_next_step_handler(callback.message, lambda msg: register_name(msg))
     if callback.data == "Поменять данные" or callback.data == "changing_student":
-        bot.edit_message_text(chat_id=callback.message.chat.id,
-                              message_id=callback.message.message_id,
-                              text="Пожалуйста, введите номер поля, которое хотите изменить:")
+        bot.send_message(callback.message.chat.id,"Пожалуйста, введите номер поля, которое хотите изменить:")
         bot.register_next_step_handler(callback.message, lambda msg: nomber_change(msg))
     if callback.data == "Поменять данные " or callback.data == "changing_teacher":
-        bot.edit_message_text(chat_id=callback.message.chat.id,
-                              message_id=callback.message.message_id,
-                              text="Пожалуйста, введите номер поля, которое хотите изменить:")
+        bot.send_message(callback.message.chat.id,"Пожалуйста, введите номер поля, которое хотите изменить:")
         bot.register_next_step_handler(callback.message, lambda msg: nomber_change_teacher(msg))
 
     if callback.data == "Поменять наименование дисциплины" or callback.data == "changing":
-        bot.edit_message_text(chat_id=callback.message.chat.id,
-                              message_id=callback.message.message_id,
-                              text="Пожалуйста, введите номер поля, которое хотите изменить:")
+        bot.send_message(callback.message.chat.id,"Пожалуйста, введите номер поля, которое хотите изменить:")
         bot.register_next_step_handler(callback.message, lambda msg: nomber_change_discepline(msg))
     if callback.data == "Добавить дисциплину" or callback.data == "add":
         bot.edit_message_text(chat_id=callback.message.chat.id,
@@ -60,9 +54,7 @@ def registr(callback):
         add_data_to_table_discipline(callback.message)
 
     if callback.data == "Поменять группу" or callback.data == "changing_group":
-        bot.edit_message_text(chat_id=callback.message.chat.id,
-                              message_id=callback.message.message_id,
-                              text="Пожалуйста, введите номер поля, которое хотите изменить:")
+        bot.send_message(callback.message.chat.id,"Пожалуйста, введите номер поля, которое хотите изменить:")
         bot.register_next_step_handler(callback.message, lambda msg: nomber_change_group(msg))
     if callback.data == "Добавить группу" or callback.data == "add_group":
         bot.edit_message_text(chat_id=callback.message.chat.id,
@@ -115,9 +107,7 @@ def registr(callback):
             bot.register_next_step_handler(callback.message,
                                            lambda msg: statystics(msg, callback.message.chat.id))
     if callback.data == "send_mark":
-        bot.edit_message_text(chat_id=callback.message.chat.id,
-                              message_id=callback.message.message_id,
-                              text="Пожалуйста, введите номер задания, по которому хотите отправить оценку:")
+        bot.send_message(callback.message.chat.id, "Пожалуйста, введите номер задания, по которому хотите отправить оценку:")
         bot.register_next_step_handler(callback.message,
                                        lambda msg: send_comment(msg, callback.message.chat.id))
 
@@ -1259,12 +1249,12 @@ def statystics(message, teacher_id):
                     for i in
                     range(len(info_complete_task)))
                 bot.send_message(message.chat.id, f"РЕШЕНИЕ ОТПРАВИЛИ {count_complete_task} студента(-ов):{output}")
-            if info_dont_complete_task:
-                out = "".join(
-                    f"\n{info_dont_complete_task[i][0]}- {info_dont_complete_task[i][1]}"
-                    for i in
-                    range(len(info_dont_complete_task)))
-                bot.send_message(message.chat.id, f"НЕ ОТПРАВИЛИ {count_dont_complete_task} студента(-ов): {out}")
+                if info_dont_complete_task:
+                    out = "".join(
+                        f"\n{info_dont_complete_task[i][0]}- {info_dont_complete_task[i][1]}"
+                        for i in
+                        range(len(info_dont_complete_task)))
+                    bot.send_message(message.chat.id, f"НЕ ОТПРАВИЛИ {count_dont_complete_task} студента(-ов): {out}")
             else:
                 bot.send_message(message.chat.id, f"Нет решённых задач от студентов.")
     if not have:
@@ -2464,11 +2454,9 @@ def send_doc():
                 name_student = cursor.fetchall()
                 for names in name_student:
                     student_name = names[0]
-                    cursor.execute("UPDATE task_list SET name_student = ?  WHERE student_id = ?",
-                                   (student_name, student_id))
                     cursor.execute(
-                        'INSERT INTO task_list (task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number, send_teacher_for_student_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        (id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number, current_date))
+                        'INSERT INTO task_list (name_student, task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number, send_teacher_for_student_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        (student_name, id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number, current_date))
             send_message_ga(teacher_id,
                             f"{name_of_discipline}\nЗадача: {the_task_for_student}\nотправлена студентам группы {group_number}")
             cursor.execute("UPDATE task_for_student SET document = NULL WHERE id= ?", (id,))
