@@ -2253,12 +2253,21 @@ def settings(message):
     admin = cursor.fetchone()[0]
     # ПРОВЕРКА ЗАРЕГ-Н ПОЛЬЗОВАТЕЛЬ ИЛИ НЕТ
     if student > 0 and teacher == 0:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
-        markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_student"))
-        markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
-        markup.add(types.InlineKeyboardButton("Обращение к администратору", callback_data="text_for_admin"))
-        bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup = markup)
+        if admin > 0:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Изменить пароль (администратор)", callback_data="change_parol"))
+            markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+            markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_student"))
+            markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
+            markup.add(types.InlineKeyboardButton("Обращение к администратору", callback_data="text_for_admin"))
+            bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup = markup)
+        else:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
+            markup.add(types.InlineKeyboardButton("Поменять личные данные", callback_data="changing_settings_student"))
+            markup.add(types.InlineKeyboardButton("Удалить аккаунт", callback_data="delete_account"))
+            markup.add(types.InlineKeyboardButton("Обращение к администратору", callback_data="text_for_admin"))
+            bot.send_message(message.chat.id, "Выберите кнопку:", reply_markup=markup)
     elif student == 0 and teacher > 0:
         if admin > 0:
             markup = types.InlineKeyboardMarkup()
