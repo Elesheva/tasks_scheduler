@@ -1,5 +1,4 @@
 import os
-
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import telebot
@@ -1023,15 +1022,26 @@ def create_pie_chart(vals, labels):
     total = sum(vals)
     start_angle = 0
     legend_x = 30
-    legend_y = 30
+    legend_y = 100
     legend_spacing = 30
     font_path = "arial.ttf"
     font = ImageFont.truetype(font_path, 25)
+    now = datetime.now()
+    months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+    current_month_index = now.month - 1
+    current_month = months[current_month_index]
+    month_font = ImageFont.truetype(font_path, 40)  # Шрифт для названия месяца
+    month_text = f"Месяц: {current_month}"
+    bbox = draw.textbbox((0, 0), month_text, font=month_font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    draw.text(((width - text_width) / 2, 20), month_text, fill="black", font=month_font)
 
     for i in range(len(vals)):
         end_angle = start_angle + (vals[i] / total) * 360
         color = tuple(int(x) for x in (255 * (i % 2), 100, 100))
-        draw.pieslice([100, 150, width - 100, height - 100], start_angle, end_angle, fill=color)
+        draw.pieslice([100, 200, width - 100, height - 80], start_angle, end_angle, fill=color)
         draw.rectangle([legend_x, legend_y + i * legend_spacing, legend_x + 20, legend_y + i * legend_spacing + 20],
                        fill=color)
         draw.text((legend_x + 24, legend_y + i * legend_spacing),
@@ -1058,7 +1068,7 @@ def statis_teacher (message):
     elif count_teacher == 0 and count_student > 0:
         cursor.execute("SELECT complete, dont_complete FROM statystic_for_student WHERE student_id = ?", (teacher_id,))
         statystic_for_student = cursor.fetchone()
-        if statystic_for_student:
+        if len(statystic_for_student) > 0:
             complete, dont_complete = statystic_for_student
             vals = [complete, dont_complete]
             labels = ["Выполненные задачи", "Не выполненные задачи"]
@@ -2541,6 +2551,15 @@ def send_coment_teacher():
     conn.commit()
     conn.close()
 
+def reset_tasks():
+    try:
+        conn = sqlite3.connect('my_database.db')
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM statystic_for_student")
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        print(f"An error occurred: {e}")
 
 scheduler = BackgroundScheduler()
 # Запланируем выполнение функции check_tasks каждую минуту
@@ -2548,6 +2567,7 @@ scheduler.add_job(check_tasks, 'interval', minutes=1)
 scheduler.add_job(send_doc, 'interval', minutes=1)
 scheduler.add_job(send_doc_for_teacher, 'interval', minutes=1)
 scheduler.add_job(send_coment_teacher, 'interval', minutes=1)
+scheduler.add_job(reset_tasks, 'cron', day=1, hour=0, minute=0)
 scheduler.start()
 
 bot.polling(none_stop=True)
