@@ -406,12 +406,12 @@ def gender_student(message, name, student_id, phone_nomber, mail):
     if gender == "1" or gender == "2":
         connection = sqlite3.connect('my_database.db')
         cursor = connection.cursor()
-        cursor.execute("SELECT id, faculty FROM discipline")
+        cursor.execute("SELECT DISTINCT faculty FROM discipline")
         info_about_faculty = cursor.fetchall()
         connection.commit()
         connection.close()
         output = "".join(
-            f"{info_about_faculty[i][0]}) {info_about_faculty[i][1]}\n"
+            f"{i+1}) {info_about_faculty[i][0]}\n"
             for i in range(len(info_about_faculty)))
         bot.send_message(message.chat.id, f"{name}, укажите ваш Факультет:\n{output} ")
         bot.register_next_step_handler(message,
@@ -434,9 +434,8 @@ def faculty_student(message, name, student_id, phone_nomber, mail, gender, info_
         return
     have = False
     for i in range(len(info_about_faculty)):
-        if info_about_faculty[i][0] == nomber:
             have = True
-            faculty = info_about_faculty[i][1]
+            faculty = info_about_faculty[i][nomber - 1]
             bot.send_message(message.chat.id, f"{name}, укажите ваш курс\nПример: 1")
             bot.register_next_step_handler(message,
                                            lambda msg: course_student(msg, name, student_id, phone_nomber, mail, gender,
@@ -902,12 +901,12 @@ def groap_table(message):
     if student > 0 and teacher == 0:
         bot.send_message(message.chat.id, f"Вы зарегистрированы как студент. Функция доступна преподавателю.")
     elif student == 0 and teacher > 0:
-        cursor.execute("SELECT id, faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
+        cursor.execute("SELECT DISTINCT faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
         faculty = cursor.fetchall()
         if not faculty:
             bot.send_message(message.chat.id, "Нет доступных факультетов.")
             return
-        output = "".join(f"{faculty[i][0]}) {faculty[i][1]}\n" for i in range(len(faculty)))
+        output = "".join(f"{i+1}) {faculty[i][0]}\n" for i in range(len(faculty)))
         bot.send_message(message.chat.id,
                          f"Вы создали следующие факультеты:\n{output}\nУкажите номер факультета, в котором создаётся группа:")
         bot.register_next_step_handler(message, lambda msg: to_table_groap(msg, teacher_id, faculty))
@@ -933,11 +932,10 @@ def to_table_groap(message, teacher_id, faculty):
         return
     have = False
     for i in range(len(faculty)):
-        if faculty[i][0] == id:
-            have = True
-            facultet = faculty[i][1]
-            bot.send_message(message.chat.id, f"Вы выбрали: {facultet}\nВведите номер группы:")
-            bot.register_next_step_handler(message, lambda msg, f=facultet: to_groap(msg, teacher_id, f))
+        have = True
+        facultet = faculty[i][id - 1]
+        bot.send_message(message.chat.id, f"Вы выбрали: {facultet}\nВведите номер группы:")
+        bot.register_next_step_handler(message, lambda msg, f=facultet: to_groap(msg, teacher_id, f))
     if not have:
         # Если мы вышли из цикла без нахождения факультета
         bot.send_message(message.chat.id, "Неверный номер факультета. Пожалуйста, попробуйте снова.")
@@ -1068,7 +1066,7 @@ def statis_teacher (message):
     elif count_teacher == 0 and count_student > 0:
         cursor.execute("SELECT complete, dont_complete FROM statystic_for_student WHERE student_id = ?", (teacher_id,))
         statystic_for_student = cursor.fetchone()
-        if len(statystic_for_student) > 0:
+        if statystic_for_student:
             complete, dont_complete = statystic_for_student
             vals = [complete, dont_complete]
             labels = ["Выполненные задачи", "Не выполненные задачи"]
@@ -1207,7 +1205,7 @@ def all_statistic_date(message, teacher_id, selected_discipline, selected_group)
             row_cells[1].text = completed_tasks_str
             row_cells[2].text = incompleted_tasks_str
             row_cells[3].text = f'{average_mark:.2f}'
-        document_name = f'statistics_{selected_group}_{selected_discipline}.docx'
+        document_name = f'statistics.docx'
         doc.save(document_name)
         bot.send_document(teacher_id, open(document_name, "rb"))
         os.remove(document_name)
@@ -1691,10 +1689,10 @@ def save_task(message, task_plan, user_id, what_time, regular, statys):
                 discipline = cursor.fetchall()
                 connection.commit()
                 connection.close()
-                output = "".join(f"{discipline[i][0]}) {discipline[i][1]}, факультет: {discipline[i][2]}" for i in
+                output = "".join(f"{discipline[i][0]}) {discipline[i][1]}, факультет: {discipline[i][2]}\n" for i in
                                  range(len(discipline)))
                 if output:
-                    bot.send_message(message.chat.id, f"Выберите дисциплину:{output}")
+                    bot.send_message(message.chat.id, f"Выберите дисциплину:\n{output}")
                     bot.register_next_step_handler(message,
                                                    lambda msg: discipline_number_statys_teacher_1(msg, task_plan,
                                                                                                   user_id, what_time,
