@@ -787,20 +787,23 @@ def changing_db_teacher(message, teacher_id, nomber):
     if nomber == '1':
         cursor.execute("UPDATE teachers SET name = ? WHERE teacher_id= ?", (new, teacher_id))
         bot.send_message(message.chat.id, "Вы поменяли ФИО")
+        connection.commit()
         changing_teacher(message, teacher_id)
     if nomber == "2":
         cursor.execute("UPDATE teachers SET phone_number = ? WHERE teacher_id= ?", (new, teacher_id))
         bot.send_message(message.chat.id, "Вы поменяли номер телефона")
+        connection.commit()
         changing_teacher(message, teacher_id)
     if nomber == "3":
         cursor.execute("UPDATE teachers SET mail = ? WHERE teacher_id= ?", (new, teacher_id))
         bot.send_message(message.chat.id, "Вы поменяли почту")
+        connection.commit()
         changing_teacher(message, teacher_id)
     if nomber == "4":
         cursor.execute("UPDATE teachers SET department = ? WHERE teacher_id= ?", (new, teacher_id))
         bot.send_message(message.chat.id, "Вы поменяли кафедру")
+        connection.commit()
         changing_teacher(message, teacher_id)
-    connection.commit()
     connection.close()
 
 # Функции для преподавателя
