@@ -209,6 +209,25 @@ def registr(callback):
                              f"Пожалуйста, выберите дисциплину:\n{output}")
             bot.register_next_step_handler(callback.message,
                                            lambda msg: all_statystic(msg, callback.message.chat.id, discipline))
+    if callback.data == "time":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается...")
+        regular = False
+        statys = 1
+        send = "time"
+        bot.send_message(callback.message.chat.id, "Какую задачу хотите запланировать? Введите название:")
+        bot.register_next_step_handler(callback.message, lambda msg: whattime(msg, callback.message.chat.id, regular, statys, send))
+
+    if callback.data == "now":
+        bot.edit_message_text(chat_id=callback.message.chat.id,
+                              message_id=callback.message.message_id,
+                              text="Ваш запрос обрабатывается...")
+        regular = False
+        statys = 1
+        send = "now"
+        bot.send_message(callback.message.chat.id, "Какую задачу хотите запланировать? Введите название:")
+        bot.register_next_step_handler(callback.message, lambda msg: whattime(msg, callback.message.chat.id, regular, statys, send))
 #НАСТРОЙКИ
     if callback.data == "changing_settings_student":
         bot.edit_message_text(chat_id=callback.message.chat.id,
@@ -1462,9 +1481,8 @@ def ocenka(message, teacher_id, mark, id, nomber):
         (teacher_id, id))
     complete = cursor.fetchall()
     now = datetime.now()
-    new_time = now + timedelta(minutes=1)
     current_date = now.strftime("%d.%m")
-    current_time = new_time.strftime("%H:%M")
+    current_time = now.strftime("%H:%M")
     for task in complete:
         task_id, student_id, group_number, the_task_for_student, name_of_discipline = task
         cursor.execute(
@@ -1474,7 +1492,8 @@ def ocenka(message, teacher_id, mark, id, nomber):
         connection.commit()
         connection.close()
         bot.send_message(teacher_id,
-                         f"Ваш комментарий:\nОценка {mark}\n{comment}\nБудет отправлен через 1 минуту. Вам придёт уведомление")
+                         f"Ваш комментарий:\nОценка {mark}\n{comment}\nБудет отправлен студенту. Вам придёт уведомление")
+        send_coment_teacher(current_date,current_time)
 
 #Получаем информацию о студентах
 
@@ -1490,11 +1509,11 @@ def info(message):
     if student > 0 and teacher == 0:
         bot.send_message(message.chat.id, f"Вы зарегистрированы как студент. Функция доступна преподавателю.")
     elif student == 0 and teacher > 0:
-        cursor.execute("SELECT faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
+        cursor.execute("SELECT DISTINCT faculty FROM discipline WHERE teacher_id = ?", (teacher_id,))
         count_teacher = cursor.fetchall()
         for i in count_teacher:
             faculty = i[0]
-            cursor.execute("SELECT name, phone_number, mail, group_number FROM student WHERE faculty = ?", (faculty,))
+            cursor.execute("SELECT DISTINCT name, phone_number, mail, group_number FROM student WHERE faculty = ?", (faculty,))
             info_ab = cursor.fetchall()
             output = "".join(
                 f"{i + 1}) {info_ab[i][0]}, {info_ab[i][1]}, {info_ab[i][2]} ГРУППА {info_ab[i][3]} " for i in
@@ -1615,25 +1634,28 @@ def new_task(message, text):
     if count_teacher > 0 and count_student > 0:
         delete_zapis(message)
     elif count_teacher > 0 and count_student == 0:
-        statys = 1
         if text == "add_regular_task":
-            regular = False
             bot.send_message(message.chat.id, "Функция доступна только студентам.")
         else:
-            regular = False
-            bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
-            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.chat.id, regular, statys))
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Сейчас", callback_data="now"))
+            markup.add(types.InlineKeyboardButton("Ко времени", callback_data="time"))
+            bot.send_message(message.chat.id,
+                             "Когда отправить задачу?",
+                             reply_markup=markup)
     elif count_teacher == 0 and count_student > 0:
         statys = 2
         print(message.text)
         if text == "add_regular_task":
+            send = "time"
             regular = True
             bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
-            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.chat.id, regular, statys))
+            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.chat.id, regular, statys, send))
         else:
             regular = False
+            send = "time"
             bot.send_message(message.chat.id, "Какую задачу хотите запланировать? Введите название:")
-            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.chat.id, regular, statys))
+            bot.register_next_step_handler(message, lambda msg: whattime(msg, message.chat.id, regular, statys, send))
     else:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("Регистрация", callback_data="registration"))
@@ -1641,20 +1663,25 @@ def new_task(message, text):
                          "У вас нет учётной записи. Для того, чтобы создать задачу необходимо зарегистрироваться.",
                          reply_markup=markup)
 
-def whattime(message, user_id, regular, statys):
+def whattime(message, user_id, regular, statys, send):
     regular = regular
     task_plan = message.text
+    if send == 'time':
     # ПРЕПОДАВАТЕЛЬ
-    if statys == 1:
-        bot.send_message(message.chat.id, "В какое время отправить задачу? (Например - 13:30)")
-        bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys))
-    # СТУДЕНТ
-    elif statys == 2:
-        bot.send_message(message.chat.id, "На какое время? (Например - 13:30)")
-        bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys))
+        if statys == 1:
+            bot.send_message(message.chat.id, "В какое время отправить задачу? (Например - 13:30)")
+            bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys, send))
+        # СТУДЕНТ
+        elif statys == 2:
+            bot.send_message(message.chat.id, "На какое время? (Например - 13:30)")
+            bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys, send))
+    if send == "now":
+        what_time = 0
+        save_task(message, task_plan, user_id, what_time, regular, statys, send)
 
 
-def save_time(message, task_plan, user_id, regular, statys):
+
+def save_time(message, task_plan, user_id, regular, statys, send):
     regular = regular
     what_time = message.text
     # Проверяем, что часы в диапазоне от 0 до 23 и минуты от 0 до 59
@@ -1664,90 +1691,109 @@ def save_time(message, task_plan, user_id, regular, statys):
             bot.send_message(message.chat.id,
                              "На какую дату хотите запланировать? Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
             bot.register_next_step_handler(message,
-                                           lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
+                                           lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys, send))
         else:
             bot.send_message(message.chat.id,
                              f"Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
-            bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys))
+            bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys, send))
 
     except ValueError:
         bot.send_message(user_id,
                          "Неверный формат. Пожалуйста, используйте формат: ЧЧ:ММ \n Пример (13:30)")
-        bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys))
+        bot.register_next_step_handler(message, lambda msg: save_time(msg, task_plan, user_id, regular, statys, send))
 
 
-def save_task(message, task_plan, user_id, what_time, regular, statys):
-    date_time = message.text
-    if statys == 1:
-        try:
-            days, month = map(int, date_time.split('.'))
-            print(month, days)
-            if 1 <= month <= 12 and 1 <= days < 32:
-                connection = sqlite3.connect('my_database.db')
-                cursor = connection.cursor()
-                cursor.execute("SELECT id, name_of_discipline,faculty FROM discipline WHERE teacher_id = ?", (user_id,))
-                discipline = cursor.fetchall()
-                connection.commit()
-                connection.close()
-                output = "".join(f"{discipline[i][0]}) {discipline[i][1]}, факультет: {discipline[i][2]}\n" for i in
-                                 range(len(discipline)))
-                if output:
-                    bot.send_message(message.chat.id, f"Выберите дисциплину:\n{output}")
-                    bot.register_next_step_handler(message,
-                                                   lambda msg: discipline_number_statys_teacher_1(msg, task_plan,
-                                                                                                  user_id, what_time,
-                                                                                                  date_time,
-                                                                                                  discipline))
+def save_task(message, task_plan, user_id, what_time, regular, statys, send):
+    if send == "time":
+        date_time = message.text
+        if statys == 1:
+            try:
+                days, month = map(int, date_time.split('.'))
+                print(month, days)
+                if 1 <= month <= 12 and 1 <= days < 32:
+                    connection = sqlite3.connect('my_database.db')
+                    cursor = connection.cursor()
+                    cursor.execute("SELECT id, name_of_discipline,faculty FROM discipline WHERE teacher_id = ?", (user_id,))
+                    discipline = cursor.fetchall()
+                    connection.commit()
+                    connection.close()
+                    output = "".join(f"{discipline[i][0]}) {discipline[i][1]}, факультет: {discipline[i][2]}\n" for i in
+                                     range(len(discipline)))
+                    if output:
+                        bot.send_message(message.chat.id, f"Выберите дисциплину:\n{output}")
+                        bot.register_next_step_handler(message,
+                                                       lambda msg: discipline_number_statys_teacher_1(msg, task_plan,
+                                                                                                      user_id, what_time,
+                                                                                                      date_time,
+                                                                                                      discipline))
+                    else:
+                        bot.send_message(message.chat.id, f"Вы ещё не добавили дисциплину.")
                 else:
-                    bot.send_message(message.chat.id, f"Вы ещё не добавили дисциплину.")
-            else:
-                bot.send_message(message.chat.id,
+                    bot.send_message(message.chat.id,
+                                     "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+                    bot.register_next_step_handler(message,
+                                                   lambda msg: save_task(msg, task_plan, user_id, what_time, regular,
+                                                                         statys, send))
+            except ValueError:
+                bot.send_message(user_id,
                                  "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
                 bot.register_next_step_handler(message,
-                                               lambda msg: save_task(msg, task_plan, user_id, what_time, regular,
-                                                                     statys))
-        except ValueError:
-            bot.send_message(user_id,
-                             "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
-            bot.register_next_step_handler(message,
-                                           lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
-        except Exception as e:
-            bot.send_message(user_id, f"Произошла ошибка: {str(e)}")
-    if statys == 2:
-        try:
-            days, month = map(int, date_time.split('.'))
-            if 1 <= month <= 12 and 1 <= days < 32:
-                count_regular_task = 0
-                connection = sqlite3.connect('my_database.db')
-                cursor = connection.cursor()
-                cursor.execute(
-                    'INSERT INTO tasks (user_id, task, task_time, date, regular_task, count_regular_task) VALUES (?, ?, ?, ?, ?, ?)',
-                    (user_id, task_plan, what_time, date_time, regular, count_regular_task))
-                cursor.execute("SELECT COUNT (*) FROM statystic_for_student WHERE student_id = ?", (user_id,))
-                count_statystic_for_student = cursor.fetchone()[0]
-                if count_statystic_for_student == 0:
-                    complete = 0
-                    dont_complete = 0
-                    all_tasks = 0
-                    cursor.execute('INSERT INTO statystic_for_student (student_id, complete, dont_complete, all_tasks) VALUES (?, ?, ?, ?)',
-                        (user_id, complete, dont_complete, all_tasks))
-                connection.commit()
-                connection.close()
-                bot.send_message(message.chat.id, "Задача добавлена!")
-            else:
-                bot.send_message(message.chat.id,
+                                               lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys, send))
+            except Exception as e:
+                bot.send_message(user_id, f"Произошла ошибка: {str(e)}")
+        if statys == 2:
+            try:
+                days, month = map(int, date_time.split('.'))
+                if 1 <= month <= 12 and 1 <= days < 32:
+                    count_regular_task = 0
+                    connection = sqlite3.connect('my_database.db')
+                    cursor = connection.cursor()
+                    cursor.execute(
+                        'INSERT INTO tasks (user_id, task, task_time, date, regular_task, count_regular_task) VALUES (?, ?, ?, ?, ?, ?)',
+                        (user_id, task_plan, what_time, date_time, regular, count_regular_task))
+                    cursor.execute("SELECT COUNT (*) FROM statystic_for_student WHERE student_id = ?", (user_id,))
+                    count_statystic_for_student = cursor.fetchone()[0]
+                    if count_statystic_for_student == 0:
+                        complete = 0
+                        dont_complete = 0
+                        all_tasks = 0
+                        cursor.execute('INSERT INTO statystic_for_student (student_id, complete, dont_complete, all_tasks) VALUES (?, ?, ?, ?)',
+                            (user_id, complete, dont_complete, all_tasks))
+                    connection.commit()
+                    connection.close()
+                    bot.send_message(message.chat.id, "Задача добавлена!")
+                else:
+                    bot.send_message(message.chat.id,
+                                     "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+                    bot.register_next_step_handler(message,
+                                                   lambda msg: save_task(msg, task_plan, user_id, what_time, regular,
+                                                                         statys, send))
+            except ValueError:
+                bot.send_message(user_id,
                                  "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
                 bot.register_next_step_handler(message,
-                                               lambda msg: save_task(msg, task_plan, user_id, what_time, regular,
-                                                                     statys))
-        except ValueError:
-            bot.send_message(user_id,
-                             "Неверный формат. Пожалуйста, используйте формат: ДД.ММ \n(Например - 12.07)")
+                                               lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys, send))
+            except Exception as e:
+                bot.send_message(user_id, f"Произошла ошибка: {str(e)}")
+    if send == "now":
+        date_time = 0
+        connection = sqlite3.connect('my_database.db')
+        cursor = connection.cursor()
+        cursor.execute("SELECT id, name_of_discipline,faculty FROM discipline WHERE teacher_id = ?", (user_id,))
+        discipline = cursor.fetchall()
+        connection.commit()
+        connection.close()
+        output = "".join(f"{discipline[i][0]}) {discipline[i][1]}, факультет: {discipline[i][2]}\n" for i in
+                         range(len(discipline)))
+        if output:
+            bot.send_message(message.chat.id, f"Выберите дисциплину:\n{output}")
             bot.register_next_step_handler(message,
-                                           lambda msg: save_task(msg, task_plan, user_id, what_time, regular, statys))
-        except Exception as e:
-            bot.send_message(user_id, f"Произошла ошибка: {str(e)}")
-
+                                           lambda msg: discipline_number_statys_teacher_1(msg, task_plan,
+                                                                                          user_id, what_time,
+                                                                                          date_time,
+                                                                                          discipline))
+        else:
+            bot.send_message(message.chat.id, f"Вы ещё не добавили дисциплину.")
 
 # ДАЛЬШЕ ТОЛЬКО ДЛЯ ПРЕПОДАВАТЕЛЯ
 def discipline_number_statys_teacher_1(message, task_plan, user_id, what_time, date_time, discipline):
@@ -1831,16 +1877,67 @@ def document_number_statys_teacher_1(message, task_plan, user_id, what_time, dat
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_name, 'wb') as new_file:
             new_file.write(downloaded_file)
+        if what_time == 0 and date_time == 0:
+            statys = 1
+            now = datetime.now()
+            new_time = now - timedelta(minutes=1)
+            date_time = now.strftime("%d.%m")
+            what_time = new_time.strftime("%H:%M")
             connection = sqlite3.connect('my_database.db')
             cursor = connection.cursor()
+            cursor.execute(
+                'INSERT INTO task_for_student (send_date, send_time, name_of_discipline, the_task_for_student, document, group_number, teacher_id, faculty, course, statys) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                (date_time, what_time, name_of_discipline, task_plan, file_name, group_number, user_id, facultet,
+                 course, statys))
+            connection.commit()
+            connection.close()
+            bot.send_message(message.chat.id,
+                             "Вся информация загружена.\nПосле отправки задания придёт уведомление.")
+            # ВЫВОД ЗАГРУЖЕНОЙ ИНФОРМАЦИИ
+            conn = sqlite3.connect('my_database.db')
+            cursor = conn.cursor()
+            cursor.execute("""
+                        SELECT student_id 
+                        FROM student 
+                        WHERE group_number = ? """, (group_number,))
+            for_student = cursor.fetchall()
+            for student in for_student:
+                student_id = student[0]
+                send_message_ga(student_id, f"{name_of_discipline}\nЗАДАНИЕ:\n{task_plan}\n")
+                bot.send_document(student_id, open(f"{file_name}", "rb"))
+                cursor.execute("""
+                                            SELECT name 
+                                            FROM student 
+                                            WHERE student_id = ? """, (student_id,))
+                name_student = cursor.fetchall()
+                for names in name_student:
+                    student_name = names[0]
+                    cursor.execute("""
+                                                SELECT id 
+                                                FROM task_for_student 
+                                                WHERE send_date = ? AND send_time = ? AND name_of_discipline = ? AND the_task_for_student = ? AND document = ? AND group_number = ? AND teacher_id = ? AND faculty = ? AND course = ? AND statys = ?""", (date_time, what_time, name_of_discipline, task_plan, file_name, group_number, user_id, facultet,
+                 course, statys))
+                    for_id = cursor.fetchall()
+                    for ids in for_id:
+                        id = ids[0]
+                        cursor.execute(
+                            'INSERT INTO task_list (name_student, task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, group_number, send_teacher_for_student_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                            (student_name, id, student_id, user_id, name_of_discipline, task_plan,
+                             group_number, date_time))
+            send_message_ga(user_id,
+                            f"{name_of_discipline}\nЗадача: {task_plan}\nотправлена студентам группы {group_number}")
+            os.remove(file_name)
+        else:
+            conn = sqlite3.connect('my_database.db')
+            cursor = conn.cursor()
             cursor.execute(
                 'INSERT INTO task_for_student (send_date, send_time, name_of_discipline, the_task_for_student, document, group_number, teacher_id, faculty, course) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 (date_time, what_time, name_of_discipline, task_plan, file_name, group_number, user_id, facultet,
                  course))
-            connection.commit()
-            connection.close()
             bot.send_message(message.chat.id, "Вся информация загружена.\nПосле отправки задания придёт уведомление.")
             # ВЫВОД ЗАГРУЖЕНОЙ ИНФОРМАЦИИ
+        conn.commit()
+        conn.close()
     else:
         bot.send_message(message.chat.id, "Пожалуйста, загрузите документ.")
         bot.register_next_step_handler(message,
@@ -1921,17 +2018,17 @@ def send_document_for_teacher(message, student_id, tasks_id):
         with open(file_name, 'wb') as new_file:
             new_file.write(downloaded_file)
             now = datetime.now()
-            new_time = now + timedelta(minutes=1)
             current_date = now.strftime("%d.%m")
-            current_time = new_time.strftime("%H:%M")
+            current_time = now.strftime("%H:%M")
             connection = sqlite3.connect('my_database.db')
             cursor = connection.cursor()
             cursor.execute("UPDATE task_list SET document = ?, task_time = ?, date = ? WHERE id = ?",
-                           (file_name, current_time, current_date, tasks_id,))
+                           (file_name, current_time, current_date, tasks_id))
             connection.commit()
             connection.close()
-            bot.send_message(student_id,
-                             "Вся информация загружена.\nВаше решение будет отправлено преподавателю через 1 минуту.\nПосле отправки вам придёт уведомление")
+        bot.send_message(student_id,
+                         "Вся информация загружена.\nПосле отправки вам придёт уведомление")
+        send_doc_for_teacher(file_name, current_time, current_date, tasks_id, student_id)
     else:
         bot.send_message(message.chat.id, "Пожалуйста, загрузите документ.")
         bot.register_next_step_handler(message,
@@ -2074,6 +2171,7 @@ def delete_tasks_from_db(message, proverka_id, statys):
                 count = cursor.fetchone()[0]
                 if count > 0:
                     bot.send_message(message.chat.id, f"Задача {id} удалена")
+                    connection.commit()
                     get_all_tasks_from_db(message)
                 else:
                     bot.send_message(message.chat.id, f"Задача {id} удалена")
@@ -2483,50 +2581,42 @@ def send_doc():
 
 
 # ОТПРАВКА РЕШЕНЁННОГО ЗАДАНИЯ ПРЕПОДАВАТЕЛЮ
-def send_doc_for_teacher():
+def send_doc_for_teacher(file_name, current_time, current_date, tasks_id, student_id):
     conn = sqlite3.connect('my_database.db')
     cursor = conn.cursor()
-    now = datetime.now()
-    current_time = now.strftime("%H:%M")
-    current_date = now.strftime("%d.%m")
     cursor.execute("""
-            SELECT task_id, student_id, name_of_discipline, teacher_id, the_task_for_student, document, group_number, complete
-            FROM task_list 
-            WHERE task_time = ? AND date = ? """, (current_time, current_date))
-    tasks = cursor.fetchall()
-    for task in tasks:
-        task_id, student_id, name_of_discipline, teacher_id, the_task_for_student, document, group_number, complete = task
-        if not complete:
-            cursor.execute("""
-                UPDATE task_list 
-                SET complete = 1 
-                WHERE task_id = ?
-            """, (task_id,))
-            cursor.execute("""
-                    SELECT name 
-                    FROM student 
-                    WHERE student_id = ? """, (student_id,))
-            name_student = cursor.fetchall()
-            for name in name_student:
-                student_name = name[0]
-                send_message_ga(teacher_id,
-                                f"Решение задачи №{task_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nОт студента: {student_name} группа {group_number} ")
-                bot.send_document(teacher_id, open(f"{document}", "rb"))
-                cursor.execute("UPDATE task_list SET name_student = ? WHERE task_id = ?", (student_name, task_id))
+        UPDATE task_list 
+        SET complete = 1 
+        WHERE document = ? AND task_time = ? AND date = ? AND id = ?
+    """, (file_name, current_time, current_date, tasks_id))
+    cursor.execute("""
+            SELECT name 
+            FROM student 
+            WHERE student_id = ? """, (student_id,))
+    name_student = cursor.fetchall()
+    for name in name_student:
+        student_name = name[0]
+        cursor.execute("""
+                    SELECT teacher_id, name_of_discipline, the_task_for_student, group_number
+                    FROM task_list 
+                    WHERE student_id = ? AND document = ? AND task_time = ? AND date = ? AND id = ? """, (student_id, file_name, current_time, current_date, tasks_id))
+        name_te = cursor.fetchall()
+        for n in name_te:
+            teacher_id, name_of_discipline, the_task_for_student, group_number = n
+            send_message_ga(teacher_id,
+                            f"Решение задачи №{tasks_id}\n{name_of_discipline}\nЗАДАНИЕ:\n{the_task_for_student}\nОт студента: {student_name} группа {group_number} ")
+            bot.send_document(teacher_id, open(f"{file_name}", "rb"))
+            cursor.execute("UPDATE task_list SET name_student = ? WHERE student_id = ? AND document = ? AND task_time = ? AND date = ? AND id = ?", (student_name, student_id, file_name, current_time, current_date, tasks_id))
             send_message_ga(student_id,
                             f"{name_of_discipline}\nРешение задачи: {the_task_for_student}\n отправлено.")
-            cursor.execute("UPDATE task_list SET document = NULL WHERE task_id = ?", (task_id,))
-        os.remove(f"{document}")
+
     conn.commit()
     conn.close()
+    os.remove(f"{file_name}")
 
-
-def send_coment_teacher():
+def send_coment_teacher(current_date,current_time):
     conn = sqlite3.connect('my_database.db')
     cursor = conn.cursor()
-    now = datetime.now()
-    current_time = now.strftime("%H:%M")
-    current_date = now.strftime("%d.%m")
     cursor.execute("""
             SELECT task_id, student_id, teacher_id, name_of_discipline, the_task_for_student, send_time, date, group_number, comment, mark
             FROM teacher_comment 
@@ -2563,8 +2653,6 @@ scheduler = BackgroundScheduler()
 # Запланируем выполнение функции check_tasks каждую минуту
 scheduler.add_job(check_tasks, 'interval', minutes=1)
 scheduler.add_job(send_doc, 'interval', minutes=1)
-scheduler.add_job(send_doc_for_teacher, 'interval', minutes=1)
-scheduler.add_job(send_coment_teacher, 'interval', minutes=1)
 scheduler.add_job(reset_tasks, 'cron', day=1, hour=0, minute=0)
 scheduler.start()
 
